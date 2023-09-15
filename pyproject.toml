@@ -1,0 +1,51 @@
+[build-system]
+requires      = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soheabs-paginators"
+description = "Paginators by Soheab."
+authors = [{ name = "Soheab_" }]
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+dependencies = ["discord.py>=2.0.0, <3.0.0", "discord-ext-modal-paginator"]
+dynamic = ["version", "readme"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Natural Language :: English",
+    "Typing :: Typed",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+
+[project.optional-dependencies]
+dev = ["black", "ruff", "typing_extensions"]
+
+[tool.setuptools]
+packages = ["discord", "discord.ext", "discord.ext.paginators"]
+
+
+[tool.setuptools.dynamic]
+version = { attr = "discord.ext.paginators.__version__" }
+readme = { file = ["README.md"], content-type = "text/markdown" }
+
+[tool.pyright]
+include = ["discord.ext.paginators"]
+exclude = ["**/__pycache__", "_build", "build", "dist", "docs"]
+reportUnnecessaryTypeIgnoreComment = "warning"
+reportUnusedImport = "error"
+pythonVersion = "3.9"
+typeCheckingMode = "strict"
+reportDuplicateImport = "warning"
+reportDeprecated = "warning"
+reportMissingTypeStubs = "ignore"
+reportPrivateUsage = "ignore"
+
+[tool.coverage.report]
+exclude_lines = ["pragma: no cover", "@overload"]
+
+[tool.black]
+line-length = 120

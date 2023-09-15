@@ -1,0 +1,1 @@
+from discord.ext.modal_paginator import *  # type: ignore
