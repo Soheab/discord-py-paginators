@@ -244,7 +244,7 @@ class ButtonPaginator(BaseClassPaginator[Page, BotT]):
         self._current_page = value
         self._update_buttons_state()
 
-    async def send(
+    async def send(  # type: ignore[override]
         self,
         *,
         ctx: Optional[ContextT] = None,
@@ -253,7 +253,7 @@ class ButtonPaginator(BaseClassPaginator[Page, BotT]):
         override_custom: bool = False,
         force_send: bool = False,
         **kwargs: Any,
-    ) -> PossibleMessage:
+    ) -> Optional[PossibleMessage]:
         page = self.get_page(self.current_page)
         return await super()._handle_send(
             page,

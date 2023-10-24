@@ -1,221 +1,175 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union
 
-import discord
-from discord.ui import Select, Button
-from discord.components import SelectOption
-from discord.utils import as_chunks
-
-from ._types import InteractionT, ContextT, Page, BotT
 from .base_paginator import BaseClassPaginator
 
-if TYPE_CHECKING:
-    from typing import Union
+import discord
 
+if TYPE_CHECKING:
+    from typing_extensions import Self
+
+    from discord import Emoji, PartialEmoji
     from discord.abc import Messageable
 
-
-__all__: tuple[str, ...] = ("SelectPaginator", "SelectPaginatorOption")
-
-
-class SelectPaginatorMoveButton(Button["SelectPaginator[Any, Any]"]):
-    view: SelectPaginator[Any, Any]  # pyright: ignore [reportIncompatibleMethodOverride]
-
-    def __init__(self, label: str, emoji: Optional[str] = None, **kwargs: Any) -> None:
-        super().__init__(label=label, emoji=emoji, row=1, **kwargs)
-
-    def __repr__(self) -> str:
-        return f"<SelectPaginatorMoveButton custom_id={self.custom_id}>"
-
-    async def callback(self, interaction: InteractionT) -> None:
-        if self.custom_id == "select_paginator_first":
-            self.view.current_page = 0
-        elif self.custom_id == "select_paginator_last":
-            self.view.current_page = len(self.view.pages) - 1
-        elif self.custom_id == "select_paginator_next":
-            self.view.current_page += 1
-        elif self.custom_id == "select_paginator_back":
-            self.view.current_page -= 1
-
-        await self.view._switch_pages(interaction)  # pyright: ignore [reportPrivateUsage]
+    from ._types import PossiblePage, ContextT, InteractionT, PossibleMessage
 
 
-class SelectPaginatorSelector(Select["SelectPaginator[Any, Any]"]):
-    view: SelectPaginator[Any, Any]  # pyright: ignore [reportIncompatibleMethodOverride]
+class _PaginatorSelect(discord.ui.Select["SelectOptionsPaginator"]):
+    view: SelectOptionsPaginator  # pyright: ignore [reportIncompatibleMethodOverride]
 
-    async def callback(self, interaction: InteractionT) -> None:
-        current_options = self.view.pages[self.view.current_page]
-        selected_value = self.values[0]
-        option = discord.utils.get(current_options, value=selected_value)
-        page: SelectPaginatorOption = self.view.get_page(current_options.index(option))  # type: ignore
-        edit_kwargs = await self.view.get_kwargs_from_page(page.content)
-        self._update_options(self.view)
-        self._set_defaults()
-
-        edit_kwargs["attachments"] = edit_kwargs.pop("files", [])  # pyright: ignore [reportUnknownArgumentType]
-        await self.view._edit_message(interaction, **edit_kwargs)  # pyright: ignore [reportPrivateUsage]
-
-    def _set_defaults(
-        self,
-    ) -> None:
-        selected_value = self.values[0]
-        for option in self.options:
-            if option.value is selected_value or option.label in selected_value:
-                option.default = True
-            else:
-                option.default = False
-
-    def _update_options(
-        self,
-        paginator: SelectPaginator[Any, Any],
-    ) -> None:
-        try:
-            self.placeholder = f"{paginator.placeholder} | {paginator.page_string}"
-        except AttributeError:
-            pass
-
-        option: SelectPaginatorOption
-        options = paginator.pages[paginator.current_page]
-        for option in options:
-            option._update(paginator, self)  # pyright: ignore [reportPrivateUsage]
-
-        self.options = options  # type: ignore
-
-
-class SelectPaginatorOption(SelectOption):
-    def __init__(
-        self,
-        content: Any,
-        *,
-        label: Optional[str] = None,
-        position: Optional[int] = None,
-        **kwargs: Any,
-    ):
-        self.custom_id: Optional[str] = None  # filled in _update
-        super().__init__(label=label or "____SelectPaginatorPlaceholder____", **kwargs)
-        self.content: Any = content
-        self.position: Optional[int] = position
-
-    def __repr__(self) -> str:
-        return f"<SelectPaginatorOption value={self.value}>"
-
-    def _update(self, paginator: SelectPaginator[Any, Any], select: SelectPaginatorSelector) -> None:
-        CLASS_NAME = "SelectPaginator"
-
-        if self.position is None:
-            self.position = list(paginator.pages[paginator.current_page]).index(self)
-        else:
-            self.position = int(self.position) - 1
-
-        if self.label == f"____{CLASS_NAME}Placeholder____":
-            self.label = f"Page {self.position + 1}"
-
-        if self.description is None:
-            self.description = f"{paginator.current_page + 1} of {paginator.max_pages}"
-
-        self.value = f"{CLASS_NAME};position={self.position}"
-
-
-class SelectPaginator(BaseClassPaginator[Page, BotT]):
-    PREVIOUS_BUTTON: SelectPaginatorMoveButton = SelectPaginatorMoveButton(
-        label="Previous",
-        emoji="⬅️",
-        custom_id="select_paginator_back",
-    )
-    NEXT_BUTTON: SelectPaginatorMoveButton = SelectPaginatorMoveButton(
-        label="Next",
-        emoji="➡️",
-        custom_id="select_paginator_next",
-    )
-
-    pages: list[list[SelectPaginatorOption]]
-
-    def __init__(
-        self,
-        pages: list[Union[Page, SelectPaginatorOption]],
-        *,
-        placeholder: Optional[str] = None,
-        **kwargs: Any,
-    ):
-        self.base_custom_id = "select_paginator"
-        self.placeholder = placeholder if placeholder is not None else "Select a page"
-
-        self.select: SelectPaginatorSelector = SelectPaginatorSelector(
-            custom_id=f"{self.base_custom_id}:0",
-            placeholder=self.placeholder,
-            min_values=1,
-            max_values=1,
+    def __init__(self, paginator: SelectOptionsPaginator) -> None:
+        options: list[discord.SelectOption] = paginator.current_options  # pyright: ignore [reportGeneralTypeIssues]
+        super().__init__(
+            placeholder=f"Select a page | {paginator.page_string}", options=options, min_values=1, max_values=1
         )
 
-        super().__init__(self.__handle_pages(pages), **kwargs)  # type: ignore
-        self.add_item(self.select)
-        self.add_item(self.PREVIOUS_BUTTON)
-        self.add_item(self.NEXT_BUTTON)
+        self.paginator = paginator
 
-    def _handle_buttons(self) -> None:
-        self.PREVIOUS_BUTTON.disabled = self.current_page <= 0
-        self.NEXT_BUTTON.disabled = len(self.pages) - 1 <= self.current_page
+    async def callback(self, interaction: discord.Interaction) -> None:
+        self.view._switch_options(self.view.current_page)  # pyright: ignore [reportPrivateUsage]
+        option = self._get_current_option()
+        kwrgs = await self.view.get_kwargs_from_page(option.content)
 
-    def _handle_per_page(self) -> int:
-        total_pages, left_over = divmod(len(self.pages), self.per_page)
-        if left_over:
-            total_pages += 1
+        kwrgs.pop("wait", None)
+        kwrgs["attachments"] = kwrgs.pop("files", [])
+        await interaction.response.edit_message(**kwrgs)  # type: ignore
 
-        return total_pages
-
-    def __handle_pages(self, _pages: list[Union[Page, SelectPaginatorOption]]) -> list[list[SelectPaginatorOption]]:
-        chunked = list(as_chunks(_pages, 25))
-        final_pages: list[list[SelectPaginatorOption]] = []
-
-        pages: list[Union[Page, SelectPaginatorOption]]
-        page: Union[Page, SelectPaginatorOption]
-        for pages in chunked:
-            parsed_page: list[SelectPaginatorOption] = []
-            for page in pages:
-                if not isinstance(page, SelectPaginatorOption):
-                    page = SelectPaginatorOption(page)
-
-                parsed_page.append(page)
-
-            final_pages.append(parsed_page)
-
-        self.pages = final_pages  # pyright: ignore [reportIncompatibleVariableOverride] # can't really fix this, its fine
-        self.select.placeholder = f"{self.placeholder} | 1/{len(final_pages)}"
-        self._current_page = 0
-        self.per_page = 1
-        self.max_pages = self._handle_per_page()
-        self.select._update_options(self)  # pyright: ignore [reportPrivateUsage]
-        self._handle_buttons()
-        del self.pages, self._current_page, chunked
-        return final_pages
-
-    def get_page(self, page_number: int) -> Union[SelectPaginatorOption, list[SelectPaginatorOption]]:  # pyright: ignore [reportIncompatibleMethodOverride]
-        pages = self.pages[self._current_page]
-        if page_number < 0 or page_number >= len(pages):
-            page_number = 0
-            return pages[page_number]
-
-        if self._current_page < 0 or self._current_page >= len(self.pages):
-            self._current_page = 0
-            return pages[page_number]
-
-        if self.per_page == 1:
-            return pages[page_number]
+    def _get_current_option(self) -> PaginatorOption:
+        selected = self.values[0]
+        found = None
+        for idx, option in enumerate(self.options):
+            if option.value == selected:
+                option.default = True
+                if not found:
+                    self.view.current_option_index = idx
+                    found = self.view.current_options[idx]
+            else:
+                option.default = False
         else:
-            base = page_number * self.per_page
-            return pages[base : base + self.per_page]
+            if not found:
+                raise ValueError("No option found, this should not happen.")
 
-    async def _switch_pages(self, interaction: InteractionT) -> None:
-        pages = self.pages[self.current_page]
-        self.select.options = pages  # type: ignore
-        self.select._update_options(self)  # pyright: ignore [reportPrivateUsage]
-        page: SelectPaginatorOption = self.get_page(0)  # type: ignore
-        kwrgs = await self.get_kwargs_from_page(page.content)
-        self._handle_buttons()
+            return found
 
+    def _reset(self):
+        for option in self.options:
+            option.default = False
+
+
+class PaginatorOption(discord.SelectOption):
+    def __init__(
+        self,
+        content: PossiblePage,
+        *,
+        label: str,
+        value: str = discord.utils.MISSING,
+        description: Optional[str] = None,
+        emoji: Optional[Union[str, Emoji, PartialEmoji]] = None,
+        default: bool = False,
+    ) -> None:
+        super().__init__(label=label, value=value, description=description, emoji=emoji, default=default)
+        self.content: PossiblePage = content
+
+    @classmethod
+    def from_original(
+        cls,
+        option: discord.SelectOption,
+        content: PossiblePage,
+    ) -> PaginatorOption:
+        if isinstance(option, PaginatorOption):
+            return option
+
+        return cls(
+            content=content,
+            label=option.label,
+            value=option.value,
+            description=option.description,
+            emoji=option.emoji,
+            default=option.default,
+        )
+
+
+class SelectOptionsPaginator(BaseClassPaginator[Any, Any]):
+    pages: dict[int, list[PaginatorOption]]   # pyright: ignore [reportIncompatibleVariableOverride]
+
+    def __init__(
+        self,
+        options: list[PaginatorOption],
+        *,
+        interaction: Optional[InteractionT] = None,
+        ctx: Optional[ContextT] = None,
+        **kwargs: Any,
+    ) -> None:
+        self._raw_options: list[PaginatorOption] = options
+        super().__init__(
+            self.__split_options(options),  # pyright: ignore [reportGeneralTypeIssues]
+            interaction=interaction,
+            ctx=ctx,
+            **kwargs,
+        )
+
+        self.current_options: list[PaginatorOption] = options
+        self.current_option_index: int = 0
+        self.select = _PaginatorSelect(self)
+        self._switch_options(0)
+        self.add_item(self.select)
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple, row=1)
+    async def previous_page(self, interaction: discord.Interaction, _: discord.ui.Button[Self]) -> None:
+        if self._current_page <= 0:
+            self._current_page = 0
+        else:
+            self._current_page -= 1
+
+        self._switch_options(self._current_page)
+        opt = self.current_options[self.current_option_index]
+        opt.default = True
+        kwrgs = await self.get_kwargs_from_page(opt.content)
         await self._edit_message(interaction, **kwrgs)
 
-    async def send(
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple, row=1)
+    async def next_page(self, interaction: discord.Interaction, _: discord.ui.Button[Self]) -> None:
+        if self._current_page >= self.max_pages - 1:
+            self._current_page = self.max_pages - 1
+        else:
+            self._current_page += 1
+
+        self._switch_options(self._current_page)
+        kwrgs = await self.get_kwargs_from_page(self.current_options[self.current_option_index].content)
+        await self._edit_message(interaction, **kwrgs)
+
+    @staticmethod
+    def __split_options(options: list[PaginatorOption]) -> dict[int, list[PaginatorOption]]:
+        pages: dict[int, list[PaginatorOption]] = {}
+        for idx, options in enumerate(discord.utils.as_chunks(options, 25)):
+            for opt_idx, option in enumerate(options):
+                option.value = f";position={opt_idx}"
+
+            pages[idx] = options
+
+        return pages
+
+    def _switch_options(self, num: int) -> None:
+        self.select._reset()  # pyright: ignore [reportPrivateUsage]
+        self.current_options = self.pages[num]
+        self.current_option_index = 0
+        first_option = self.current_options[0]
+        first_option.default = True
+
+        self.select.options = self.current_options  # type: ignore
+        self.select.placeholder = f"Select a page | {self.page_string}"
+
+        self.previous_page.disabled = self.current_page <= 0
+        self.next_page.disabled = self.current_page >= self.max_pages - 1
+
+    def get_option(self, option_index: int) -> PaginatorOption:
+        if option_index < 0 or option_index >= self.max_pages:
+            self.current_option_index = 0
+            return self.current_options[self._current_page]
+
+        return self.current_options[self.current_option_index]
+
+    async def send(  # type: ignore[override]
         self,
         *,
         ctx: Optional[ContextT] = None,
@@ -224,15 +178,16 @@ class SelectPaginator(BaseClassPaginator[Page, BotT]):
         override_custom: bool = False,
         force_send: bool = False,
         **kwargs: Any,
-    ):
-        page = self.get_page(self.current_page)
-        content = page.content  # type: ignore
+    ) -> Optional[PossibleMessage]:
+        self._switch_options(self._current_page)
+        page = self.get_option(self.current_option_index)
+        page.default = True
         return await super()._handle_send(
-            content,
+            page.content,
             ctx=ctx,
             send_to=send_to,
             interaction=interaction,
-            force_send=force_send,
             override_custom=override_custom,
+            force_send=force_send,
             **kwargs,
         )

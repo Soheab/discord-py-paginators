@@ -5,8 +5,8 @@ from discord.ext import commands
 
 if TYPE_CHECKING:
     from typing_extensions import TypeVar
-    BotT = TypeVar('BotT', bound=commands.Bot, covariant=True, default=commands.Bot)  # type: ignore
-    ClientT = TypeVar('ClientT', bound=discord.Client, covariant=True, default=discord.Client)  # type: ignore
+    BotT = TypeVar('BotT', bound=commands.Bot, covariant=True, default=commands.Bot)
+    ClientT = TypeVar('ClientT', bound=discord.Client, covariant=True, default=discord.Client) 
 else:
     ClientT = TypeVar('ClientT', bound=discord.Client, covariant=True)  # type: ignore
     BotT = TypeVar('BotT', bound=commands.Bot, covariant=True)

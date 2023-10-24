@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, Optional, Set, TypedDict, Union
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, Optional, TypedDict, Union
 
 from inspect import signature
 
@@ -42,14 +42,11 @@ maybe_coroutine = discord.utils.maybe_coroutine
 
 
 class PaginatorContext(Generic[BotT]):
-    def __init__(self, obj: Union[ContextT, InteractionT]) -> None:
-        self.obj = obj
+    def __init__(self, obj: BotT) -> None:
+        self.obj: BotT = obj
 
     def __getattr__(self, __name: str) -> Any:
-        obj = object.__getattribute__(self, "obj")
-        if __name == "obj":
-            return obj
-
+        obj: BotT = object.__getattribute__(self, "obj")
         if not (res := object.__getattribute__(obj, __name)):
             return res
 
@@ -60,7 +57,7 @@ class PaginatorContext(Generic[BotT]):
         if isinstance(self.obj, discord.Interaction):
             return self.obj.user
 
-        return self.obj.author
+        return self.obj.author  # type: ignore
 
     @property
     def author_id(self) -> int:
@@ -68,7 +65,7 @@ class PaginatorContext(Generic[BotT]):
 
     @property
     def guild(self) -> Optional[Guild]:
-        return self.obj.guild
+        return self.obj.guild  # type: ignore
 
     @property
     def channel(self) -> Union[GuildChannel, Thread]:
@@ -83,7 +80,7 @@ class PaginatorContext(Generic[BotT]):
 
 
 class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
-    _message: PossibleMessage
+    message: Optional[PossibleMessage]
 
     def __init__(
         self,
@@ -115,9 +112,9 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
         self._interaction: Optional[InteractionT] = interaction
         self._context: Optional[PaginatorContext[BotT]] = None
         if self._ctx:
-            self._context = PaginatorContext(self._ctx)
+            self._context = PaginatorContext(self._ctx)  # type: ignore
         elif self._interaction:
-            self._context = PaginatorContext(self._interaction)
+            self._context = PaginatorContext(self._interaction)  # type: ignore
 
         self.check = check
         if self.check:
@@ -131,7 +128,7 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
         self.disable_after = disable_after
         self.clear_buttons_after = clear_buttons_after
 
-        self._message = message  # type: ignore
+        self.message = message
         self._reset_base_kwargs()
 
     @ContextProperty
@@ -139,11 +136,11 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
         """The paginator context."""
         if self._context:
             return self._context
-        
+
         if self._ctx:
-            self._context = PaginatorContext(self._ctx)
+            self._context = PaginatorContext(self._ctx)  # type: ignore
         elif self._interaction:
-            self._context = PaginatorContext(self._interaction)
+            self._context = PaginatorContext(self._interaction)  # type: ignore
 
         return self._context
 
@@ -192,10 +189,11 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
                 else:
                     self._base_kwargs.update(send_kwargs)  # type: ignore
 
+        # if self.per_page > 1 and isinstance(page, (list, tuple)):
+        #   raise ValueError("format_page must be used to format multiple pages.")
         if isinstance(page, (list, tuple)):
             for _page in page:
                 page = await self.get_kwargs_from_page(_page, skip_formatting=True)  # type: ignore
-
 
         if isinstance(page, (int, str)):
             self._base_kwargs["content"] = f"{page}\n\n{self.page_string}"
@@ -238,13 +236,13 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
 
     async def interaction_check(self, interaction: InteractionT) -> bool:
         if self.check:
-            return await maybe_coroutine(self.check, interaction.user.id, interaction=interaction, ctx=self._ctx) 
+            return await maybe_coroutine(self.check, interaction.user.id, interaction=interaction, ctx=self._ctx)
 
         if self._interaction is None and self._ctx is None:
             return True
 
         client = interaction.client
-        TO_CHECK: Set[Union[int, Any]] = {interaction.user.id}.union(set(getattr(client, "owner_ids", set())))
+        TO_CHECK: set[Union[int, Any]] = {interaction.user.id}.union(set(getattr(client, "owner_ids", set())))  # pyright: ignore [reportUnknownArgumentType]
         if getattr(client, "owner_id", None):
             TO_CHECK.union({client.owner_id})  # type: ignore
 
@@ -254,13 +252,13 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
         return page
 
     async def stop_paginator(self) -> None:
-        if not self._message:
+        if not self.message:
             self.stop()
             return
 
         if self.delete_after:
             try:
-                await self._message.delete()
+                await self.message.delete()
             except (discord.NotFound, discord.Forbidden):
                 pass
             return
@@ -281,7 +279,7 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
 
     async def _edit_message(self, interaction: Optional[InteractionT] = None, /, **kwargs: Any) -> None:
         if interaction is not None:
-            self._interaction = interaction 
+            self._interaction = interaction
 
         to_call: Optional[Callable[..., Coroutine[Any, Any, Any]]] = None
         if self._interaction:
@@ -292,8 +290,8 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
                 else:
                     to_call = self._interaction.message.edit
 
-        elif self._message:
-            to_call = self._message.edit
+        elif self.message:
+            to_call = self.message.edit
         else:
             ValueError("No interaction or message to edit.")
 
@@ -313,11 +311,11 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
         interaction: Optional[InteractionT] = None,
         override_custom: bool = False,
         force_send: bool = False,
-        **kwargs: Any,
+        **kwargs,
     ) -> PossibleMessage:
         raise NotImplementedError("send must be implemented in a subclass.")
 
-    async def _handle_send(
+    async def _handle_send(  
         self,
         page: Any,
         *,
@@ -327,7 +325,7 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
         override_custom: bool = False,
         force_send: bool = False,
         **kwargs: Any,
-    ) -> PossibleMessage:
+    ) -> Optional[PossibleMessage]:
         if ctx and interaction:
             raise ValueError("ctx and interaction cannot be both set.")
 
@@ -335,26 +333,26 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
         self._ctx = ctx or self._ctx  # type: ignore
         send_kwargs = await self.get_kwargs_from_page(page, send_kwargs=kwargs if override_custom else {})
 
-        if self._message is not None and not force_send:  # pyright: ignore [reportUnnecessaryComparison]
-            await self._edit_message(interaction, **send_kwargs)
-            return self._message
+        if self.message is not None and not force_send:
+            await self._edit_message(self._interaction, **send_kwargs)
+            return
 
         if send_to is not None:
             self.message = await send_to.send(**send_kwargs)  # type: ignore
-            return self._message
+            return self.message  # type: ignore
 
         elif self._interaction is not None:
             if self._interaction.response.is_done():
                 send_kwargs["wait"] = True
-                self._message = await self._interaction.followup.send(**send_kwargs)  # type: ignore
+                self.message = await self._interaction.followup.send(**send_kwargs)  # type: ignore
             else:
                 await self._interaction.response.send_message(**send_kwargs)  # type: ignore
-                self._message = await interaction.original_response()  # type: ignore
+                self.message = await interaction.original_response()  # type: ignore
 
         elif self._ctx is not None:
-            self._message = await self._ctx.send(**send_kwargs)  # type: ignore
+            self.message = await self._ctx.send(**send_kwargs)  # type: ignore
 
         else:
             raise ValueError("ctx or interaction or send_to must be provided")
 
-        return self._message  # pyright: ignore [reportUnknownVariableType]
+        return self.message  # type: ignore

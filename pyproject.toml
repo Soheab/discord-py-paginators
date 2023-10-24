@@ -8,7 +8,7 @@ description = "Paginators by Soheab."
 authors = [{ name = "Soheab_" }]
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
-dependencies = ["discord.py>=2.0.0, <3.0.0", "discord-ext-modal-paginator"]
+dependencies = ["discord.py>=2.0.0, <3.0.0"]
 dynamic = ["version", "readme"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -23,6 +23,7 @@ classifiers = [
 
 [project.optional-dependencies]
 dev = ["black", "ruff", "typing_extensions"]
+modalpaginator = ["discord-ext-modal-paginator"]
 
 [tool.setuptools]
 packages = ["discord", "discord.ext", "discord.ext.paginators"]
