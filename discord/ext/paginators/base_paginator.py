@@ -252,8 +252,8 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
         return page
 
     async def stop_paginator(self) -> None:
+        self.stop()
         if not self.message:
-            self.stop()
             return
 
         if self.delete_after:
@@ -271,8 +271,6 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
 
             await self._edit_message(view=self)
             return
-
-        self.stop()
 
     async def on_timeout(self) -> None:
         await self.stop_paginator()
