@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 
 from .base_paginator import BaseClassPaginator
 
@@ -15,18 +15,18 @@ if TYPE_CHECKING:
 
 
 class _PaginatorSelect(discord.ui.Select["SelectOptionsPaginator"]):
-    view: SelectOptionsPaginator  # pyright: ignore [reportIncompatibleMethodOverride]
+    view: SelectOptionsPaginator  # type: ignore
 
     def __init__(self, paginator: SelectOptionsPaginator) -> None:
-        options: list[discord.SelectOption] = paginator.current_options  # pyright: ignore [reportGeneralTypeIssues]
+        options: Sequence[discord.SelectOption] = paginator.current_options
         super().__init__(
-            placeholder=f"Select a page | {paginator.page_string}", options=options, min_values=1, max_values=1
+            placeholder=f"Select a page | {paginator.page_string}", options=options, min_values=1, max_values=1 # type: ignore
         )
 
         self.paginator = paginator
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        self.view._switch_options(self.view.current_page)  # pyright: ignore [reportPrivateUsage]
+        self.view._switch_options(self.view.current_page) 
         option = self._get_current_option()
         kwrgs = await self.view.get_kwargs_from_page(option.content)
 
@@ -90,7 +90,7 @@ class PaginatorOption(discord.SelectOption):
 
 
 class SelectOptionsPaginator(BaseClassPaginator[Any, Any]):
-    pages: dict[int, list[PaginatorOption]]   # pyright: ignore [reportIncompatibleVariableOverride]
+    pages: dict[int, list[PaginatorOption]]  # type: ignore
 
     def __init__(
         self,
@@ -102,7 +102,7 @@ class SelectOptionsPaginator(BaseClassPaginator[Any, Any]):
     ) -> None:
         self._raw_options: list[PaginatorOption] = options
         super().__init__(
-            self.__split_options(options),  # pyright: ignore [reportGeneralTypeIssues]
+            self.__split_options(options),  # type: ignore
             interaction=interaction,
             ctx=ctx,
             **kwargs,
@@ -150,7 +150,7 @@ class SelectOptionsPaginator(BaseClassPaginator[Any, Any]):
         return pages
 
     def _switch_options(self, num: int) -> None:
-        self.select._reset()  # pyright: ignore [reportPrivateUsage]
+        self.select._reset()
         self.current_options = self.pages[num]
         self.current_option_index = 0
         first_option = self.current_options[0]
@@ -169,7 +169,7 @@ class SelectOptionsPaginator(BaseClassPaginator[Any, Any]):
 
         return self.current_options[self.current_option_index]
 
-    async def send(  # type: ignore[override]
+    async def send(  # type: ignore
         self,
         *,
         ctx: Optional[ContextT] = None,

@@ -309,7 +309,7 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
         interaction: Optional[InteractionT] = None,
         override_custom: bool = False,
         force_send: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> PossibleMessage:
         raise NotImplementedError("send must be implemented in a subclass.")
 

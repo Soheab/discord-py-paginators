@@ -42,8 +42,8 @@ pythonVersion = "3.9"
 typeCheckingMode = "strict"
 reportDuplicateImport = "warning"
 reportDeprecated = "warning"
-reportMissingTypeStubs = "ignore"
-reportPrivateUsage = "ignore"
+reportMissingTypeStubs = "none"
+reportPrivateUsage = "none"
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "@overload"]

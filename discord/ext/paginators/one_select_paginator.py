@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
     from discord.abc import Messageable
 
+    from ._types import PossibleMessage
+
 
 __all__: tuple[str, ...] = ("SelectPaginator", "SelectPaginatorOption")
 
@@ -27,8 +29,8 @@ class SelectPaginatorSelector(Select["SelectPaginator[Any, Any]"]):
         edit_kwargs = await self.view.get_kwargs_from_page(page.content)
         self._set_defaults(self.values[0])
 
-        edit_kwargs["attachments"] = edit_kwargs.pop("files", [])  # pyright: ignore [reportUnknownArgumentType]
-        await self.view._edit_message(interaction, **edit_kwargs)  # pyright: ignore [reportPrivateUsage]
+        edit_kwargs["attachments"] = edit_kwargs.pop("files", [])
+        await self.view._edit_message(interaction, **edit_kwargs)
 
     def _set_defaults(self, selected_value: str) -> None:
         for option in self.options:
@@ -46,7 +48,7 @@ class SelectPaginatorOption(SelectOption):
         label: Optional[str] = None,
         position: Optional[int] = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         self.custom_id: Optional[str] = None  # filled in _update
         super().__init__(label=label or "____SelectPaginatorPlaceholder____", **kwargs)
         self.content: Any = content
@@ -81,7 +83,7 @@ class SelectPaginator(BaseClassPaginator[Page, BotT]):
         custom_id: Optional[str] = None,
         placeholder: Optional[str] = None,
         **kwargs: Any,
-    ):
+    ) -> None:
         super().__init__(pages, **kwargs)  # type: ignore
         if len(pages) > 25:
             raise ValueError("SelectPaginator cannot have more than 25 pages.")
@@ -112,11 +114,11 @@ class SelectPaginator(BaseClassPaginator[Page, BotT]):
 
         self.pages = sorted(new_pages, key=lambda x: x.position if x.position is not None else new_pages.index(x))  # pyright: ignore [reportIncompatibleVariableOverride] # dw
         for new_page in new_pages:
-            new_page._update(self)  # pyright: ignore [reportPrivateUsage]
+            new_page._update(self)
             self.select.append_option(new_page)
 
 
-    async def send(
+    async def send(  # type: ignore
         self,
         *,
         ctx: Optional[ContextT] = None,
@@ -125,7 +127,7 @@ class SelectPaginator(BaseClassPaginator[Page, BotT]):
         override_custom: bool = False,
         force_send: bool = False,
         **kwargs: Any,
-    ):
+    ) -> Optional[PossibleMessage]:
         page = self.get_page(self.current_page)
         content = page.content
         return await super()._handle_send(

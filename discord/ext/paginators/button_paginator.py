@@ -97,32 +97,32 @@ class PaginatorButton(Button["ButtonPaginator[Any, Any]"]):
         return modal.value
 
     async def callback(self, interaction: InteractionT) -> None: 
-        self.view._interaction = interaction  # pyright: ignore [reportPrivateUsage] # idc
+        self.view._interaction = interaction # idc
 
         if self.custom_id == "stop_button":
             await self.view.stop_paginator()
             return
 
         if self.custom_id == "right_button":
-            self.view._current_page += 1  # pyright: ignore [reportPrivateUsage]
+            self.view._current_page += 1
         elif self.custom_id == "left_button":
-            self.view._current_page -= 1  # pyright: ignore [reportPrivateUsage]
+            self.view._current_page -= 1
         elif self.custom_id == "first_button":
-            self.view._current_page = 0  # pyright: ignore [reportPrivateUsage]
+            self.view._current_page = 0
         elif self.custom_id == "last_button":
-            self.view._current_page = self.view.max_pages - 1  # pyright: ignore [reportPrivateUsage]
+            self.view._current_page = self.view.max_pages - 1
         elif self.custom_id == "page_indicator_button":
             new_page = await self.__handle_modal(interaction)
             if new_page is not None:
-                self.view._current_page = new_page  # pyright: ignore [reportPrivateUsage]
+                self.view._current_page = new_page
             else:
                 return
 
-        self.view._update_buttons_state()  # pyright: ignore [reportPrivateUsage]
-        pages = self.view.get_page(self.view._current_page)  # pyright: ignore [reportPrivateUsage]
+        self.view._update_buttons_state()
+        pages = self.view.get_page(self.view._current_page)
         edit_kwargs = (await self.view.get_kwargs_from_page(pages)).copy()
         edit_kwargs["attachments"] = edit_kwargs.pop("files", [])
-        await self.view._edit_message(interaction, **edit_kwargs)  # pyright: ignore [reportPrivateUsage]
+        await self.view._edit_message(interaction, **edit_kwargs)
 
 
 class ButtonPaginator(BaseClassPaginator[Page, BotT]):
