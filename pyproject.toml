@@ -3,12 +3,12 @@ requires      = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "discord-ext-paginators"
-description = "Paginators by Soheab."
+name = "discord-py-paginators"
+description = "Extension for discord.py that provides various paginators."
 authors = [{ name = "Soheab_" }]
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
-dependencies = ["discord.py>=2.0.0, <3.0.0"]
+dependencies = ["discord.py>=2.2.0, <3.0.0"]
 dynamic = ["version", "readme"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
