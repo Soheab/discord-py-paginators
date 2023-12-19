@@ -1,232 +1,271 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Callable, Coroutine, Generic, Optional, TypedDict, Union
+from typing import TYPE_CHECKING, Any, Coroutine, Generic, Literal, Optional, Sequence, Union, overload
 
-from inspect import signature
+import inspect
 
 import discord
-from discord.abc import Messageable
 
-from .errors import *
-from .utils import ContextProperty
-from ._types import Page, PossibleMessage, InteractionT, ContextT, BotT
+from ._types import Page
+from .errors import NoPages
 
 if TYPE_CHECKING:
-    from typing_extensions import Self, NotRequired
-    from typing import Awaitable, Protocol, Union
-    from discord import Guild, Member, User, Thread
-    from discord.abc import GuildChannel
+    from typing_extensions import Self
 
-    class PaginatorCheck(Protocol):
-        def __call__(
-            self, author_id: int, /, *, interaction: Optional[InteractionT] = None, ctx: Optional[ContextT] = None
-        ) -> Union[bool, Awaitable[bool]]:
-            ...
-
-    class BaseKwargs(TypedDict):
-        content: Optional[str]
-        embeds: list[discord.Embed]
-        view: Self
-
-        files: NotRequired[list[discord.File]]
-        attachments: NotRequired[list[discord.File]]  # used in edit over files
-        wait: NotRequired[bool]  # webhook/followup
-
-else:
-    BaseKwargs = dict[str, Any]
-    from typing import Callable as PaginatorCheck
+    from ._types import PaginatorCheck, BaseKwargs, InteractionT, Destination
 
 
-__all__: tuple[str, ...] = ("BaseClassPaginator", "PaginatorContext",)
+class BaseClassPaginator(discord.ui.View, Generic[Page]):
+    """Base class for all paginators.
+    
+    Parameters
+    ----------
+    pages: Sequence[Page]
+        A sequence of pages to paginate.
+        Supported types for pages:
+        - :class:`str`: Will be set as the content of the message.
+        - :class:`discord.Embed`: Will be appended to the embeds of the message.
+        - :class:`discord.File`: Will be appended to the files of the message.
+        - :class:`discord.Attachment`: Calls :meth:`discord.Attachment.to_file` and appends it to the files of the message.
+        - :class:`Sequence[Page]`: Will be flattened and each page will be handled as above.
+        
+        Any other types will probably be ignored.
 
-maybe_coroutine = discord.utils.maybe_coroutine
+    per_page: int
+        The amount of pages to display per page.
+        Defaults to ``1``.
 
+        E,g: If ``per_page`` is ``2`` and ``pages`` is ``["1", "2", "3", "4"]``, then the message 
+        will show ``["1", "2"]`` on the first page and ``["3", "4"]`` on the second page.
+    
+    author_id: Optional[int]
+        The id of the user who can interact with the paginator.
+        Defaults to ``None``.
+    
+    check: Optional[PaginatorCheck[Self]]
+        A callable that checks if the interaction is valid. This must be a callable that takes 2 or 3 parameters.
+        The last two parameters represent the interaction and paginator respectively. 
+        It CAN be a coroutine.
 
-class PaginatorContext(Generic[BotT]):
-    def __init__(self, obj: BotT) -> None:
-        self.obj: BotT = obj
+        This is called in :meth:`discord.ui.View.interaction_check`.
 
-    def __getattr__(self, __name: str) -> Any:
-        obj: BotT = object.__getattribute__(self, "obj")
-        if not (res := object.__getattribute__(obj, __name)):
-            return res
+        If ``author_id`` is not ``None``, this won't be called.
+        Defaults to ``None``.
 
-        raise AttributeError(f"{self.__class__.__name__} or {self.__class__.__name__}.obj has no attribute {__name}")
+    always_allow_bot_owner: bool
+        Whether to always allow the bot owner to interact with the paginator.
+        Defaults to ``True``.
+    
+    delete_after: bool
+        Whether to delete the message after the paginator stops. Only works if :attr:`.BaseClassPaginator.message` is not ``None``.
+        Defaults to ``False``.
+    
+    disable_after: bool
+        Whether to disable the paginator after the paginator stops. Only works if :attr:`.BaseClassPaginator.message` is not ``None``.
+        Defaults to ``False``.
+    
+    clear_buttons_after: bool
+        Whether to clear the buttons after the paginator stops. Only works if :attr:`.BaseClassPaginator.message` is not ``None``.
+        Defaults to ``False``.
 
-    @property
-    def author(self) -> Union[Member, User]:
-        if isinstance(self.obj, discord.Interaction):
-            return self.obj.user
+    message: Optional[discord.Message]
+        The message to use for the paginator. This is set automatically when :meth:`.BaseClassPaginator._handle_send` is called.
+        Defaults to ``None``.
 
-        return self.obj.author  # type: ignore
+    timeout: Optional[Union[int, float]]
+        The timeout for the paginator.
+        Defaults to ``180.0``.
+    """
 
-    @property
-    def author_id(self) -> int:
-        return self.author.id
-
-    @property
-    def guild(self) -> Optional[Guild]:
-        return self.obj.guild  # type: ignore
-
-    @property
-    def channel(self) -> Union[GuildChannel, Thread]:
-        return self.obj.channel  # type: ignore
-
-    @property
-    def bot(self) -> BotT:
-        if isinstance(self.obj, discord.Interaction):
-            return self.obj.client  # type: ignore
-
-        return self.obj.bot  # type: ignore
-
-
-class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
-    message: Optional[PossibleMessage]
-
+    __slots__ = (
+        "pages",
+        "per_page",
+        "max_pages",
+        "author_id",
+        "delete_after",
+        "disable_after",
+        "clear_buttons_after",
+        "message",
+        "_check",
+        "_current_page",
+        "__base_kwargs",
+    )
     def __init__(
         self,
-        pages: list[Page],
+        pages: Sequence[Page],
         *,
-        ctx: Optional[ContextT[BotT]] = None,
-        interaction: Optional[InteractionT] = None,
-        check: Optional[PaginatorCheck] = None,
+        per_page: int = 1,
         author_id: Optional[int] = None,
+        check: Optional[PaginatorCheck[Self]] = None,
+        always_allow_bot_owner: bool = True,
         delete_after: bool = False,
         disable_after: bool = False,
         clear_buttons_after: bool = False,
-        per_page: int = 1,
-        message: Optional[PossibleMessage] = None,
-        timeout: Union[int, float] = 180.0,
+        message: Optional[discord.Message] = None,
+        timeout: Optional[Union[int, float]] = 180.0,
     ) -> None:
         super().__init__(timeout=timeout)
 
-        self.pages: list[Page] = pages
         if not pages:
             raise NoPages("No pages provided.")
-
+        if per_page < 1:
+            raise ValueError("per_page must be greater than 0.")
+        
+        self.pages: Sequence[Page] = pages
         self.per_page: int = per_page
-        self.max_pages: int = self._handle_per_page()
+        self.max_pages: int = len(pages) // per_page + bool(len(pages) % per_page)
 
         self._current_page: int = 0
 
-        self._ctx: Optional[ContextT[BotT]] = ctx
-        self._interaction: Optional[InteractionT] = interaction
-        self._context: Optional[PaginatorContext[BotT]] = None
-        if self._ctx:
-            self._context = PaginatorContext(self._ctx)  # type: ignore
-        elif self._interaction:
-            self._context = PaginatorContext(self._interaction)  # type: ignore
+        self.author_id: Optional[int] = author_id
+        self._check: Optional[PaginatorCheck[Self]] = None
+        if check is not None:
+            if not callable(check) or len(inspect.signature(check).parameters) not in (2, 3):
+                raise TypeError((
+                    "check must be a callable with exactly 2 or 3 parameters. Last two "
+                    "representing the interaction and paginator. `check(self, interaction, "
+                    "paginator)` or `check(interaction, paginator)`."
+                ))
+        
+        self.always_allow_bot_owner: bool = always_allow_bot_owner
+        self.delete_after: bool = delete_after
+        self.disable_after: bool = disable_after
+        self.clear_buttons_after: bool = clear_buttons_after
 
-        self.check = check
-        if self.check:
-            if not callable(check) or not len(signature(check).parameters) == 3:
-                raise CallableSignatureError(
-                    "check must be a callable with exactly 3 parameters. Represents the author_id, interaction and ctx."
-                )
+        self.message: Optional[discord.Message] = message
 
-        self.author_id = author_id
-        self.delete_after = delete_after
-        self.disable_after = disable_after
-        self.clear_buttons_after = clear_buttons_after
+        self.__reset_base_kwargs()
 
-        self.message = message
-        self._reset_base_kwargs()
 
-    @ContextProperty
-    def context(self):
-        """The paginator context."""
-        if self._context:
-            return self._context
+    def __reset_base_kwargs(self) -> None:
+        self.__base_kwargs: BaseKwargs = {"content": None, "embeds": [], "view": self}
 
-        if self._ctx:
-            self._context = PaginatorContext(self._ctx)  # type: ignore
-        elif self._interaction:
-            self._context = PaginatorContext(self._interaction)  # type: ignore
+    @staticmethod
+    def __get_bot_owners_ids_from_interaction(interaction: InteractionT) -> list[int]:
+        owner_ids: list[int] = []
+        client = interaction.client
+        if owner_id_attr := getattr(client, "owner_id", None):
+            owner_ids.append(owner_id_attr)
+        if owner_ids_attr := getattr(client, "owner_ids", set[int]()):
+            owner_ids.extend(owner_ids_attr)
 
-        return self._context
+        return owner_ids
 
     @property
     def current_page(self) -> int:
+        """:class:`int`: The current page. Starts from ``0``."""
         return self._current_page
-
+    
     @current_page.setter
     def current_page(self, value: int) -> None:
+        """:class:`int`: Sets the current page to the given value."""
         self._current_page = value
 
     @property
     def page_string(self) -> str:
+        """:class:`str`: A string representing the current page and the max pages."""
         return f"Page {self.current_page + 1} of {self.max_pages}"
-
-    def _reset_base_kwargs(self) -> None:
-        self._base_kwargs: BaseKwargs = {"content": None, "embeds": [], "view": self}
-
-    def _handle_per_page(self) -> int:
-        total_pages, left_over = divmod(len(self.pages), self.per_page)
-        if left_over:
-            total_pages += 1
-
-        return total_pages
-
+    
     def stop(self) -> None:
-        self._reset_base_kwargs()
-        super().stop()
+        """Stops the view and resets the base kwargs."""
+        self.__reset_base_kwargs()
+        self.message = None
+        return super().stop()
 
-    async def get_kwargs_from_page(
-        self,
-        page: Union[Page, list[Page]],
-        send_kwargs: dict[str, Any] = {},
-        skip_formatting: bool = False,
-    ) -> BaseKwargs:
-        if not skip_formatting:
-            self._reset_base_kwargs()
-            page = await maybe_coroutine(self.format_page, page)
+    async def on_timeout(self) -> None:
+        """This method is called when the paginator times out.
+        
+        This method does the following checks (in order):
+        - Calls :meth:`.BaseClassPaginator.stop_paginator`.
+        - Calls :meth:`discord.ui.View.on_timeout`.    
+        """
+        await self.stop_paginator()
+        await super().on_timeout()
 
-        if send_kwargs:
-            for key, value in send_kwargs.items():
-                if key in ("embed", "file"):
-                    self._base_kwargs[f"{key}s"] = value  # type: ignore # literal keys.
-                elif key == "view":
-                    continue
-                else:
-                    self._base_kwargs.update(send_kwargs)  # type: ignore
+    async def interaction_check(self, interaction: InteractionT) -> bool:
+        """This method is called when the paginator receives an interaction.
 
-        # if self.per_page > 1 and isinstance(page, (list, tuple)):
-        #   raise ValueError("format_page must be used to format multiple pages.")
-        if isinstance(page, (list, tuple)):
-            for _page in page:
-                page = await self.get_kwargs_from_page(_page, skip_formatting=True)  # type: ignore
+        This method does the following checks (in order):
+        - If :attr:`.BaseClassPaginator.always_allow_bot_owner` is ``True``, it checks if the interaction's author id is one of the bot owners.
+        - If :attr:`.BaseClassPaginator.author_id` is not ``None``, it checks if the interaction's author id is the same as the one set.
+        - If :attr:`.BaseClassPaginator._check` is not ``None``, it calls it and checks if it returns ``True``.
+        - If none of the above checks are ``True``, it calls :meth:`discord.ui.View.interaction_check`.
+        
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction received.
+        """
+        user_id = interaction.user.id
+        owner_ids: list[int] = []
 
-        if isinstance(page, (int, str)):
-            self._base_kwargs["content"] = f"{page}\n\n{self.page_string}"
-        elif isinstance(page, dict):
-            self._base_kwargs.update(page)  # type: ignore
-        elif isinstance(page, discord.Embed):
-            if not page.footer.text:
-                page.set_footer(text=self.page_string)
-            else:
-                if not "|" in page.footer.text:
-                    page.set_footer(text=f"{page.footer.text} | {self.page_string}")
+        if self.always_allow_bot_owner:
+            owner_ids = self.__get_bot_owners_ids_from_interaction(interaction)
+            if user_id in owner_ids:
+                return True
+        
+        if self.author_id is not None and user_id == self.author_id:
+            return True
+        
+        if self._check is not None:
+            return await discord.utils.maybe_coroutine(self._check, self, interaction)
+        
+        return await super().interaction_check(interaction)
 
-            self._base_kwargs["embeds"].append(page)
+    def _format_page(self, page: Union[Page, Sequence[Page]]) -> Coroutine[Any, Any, Union[Page, Sequence[Page]]]:
+        return discord.utils.maybe_coroutine(self.format_page, page)
+        
+    async def format_page(self, page: Union[Page, Sequence[Page]]) -> Union[Page, Sequence[Page]]:
+        """This method can be overridden to format the page before sending it.
+        By default, it returns the page as is.
+        
+        Parameters
+        ----------
+        page: Union[Page, Sequence[Page]]
+            The page to format.
 
-        elif isinstance(page, discord.File):
-            page.reset()
-            if not "files" in self._base_kwargs:
-                self._base_kwargs["files"] = [page]
-            else:
-                self._base_kwargs["files"].append(page)
+        Returns
+        -------
+        Union[Page, Sequence[Page]]
+            The formatted page(s).
+        """
+        return page
 
-            if not self._base_kwargs["content"]:
-                self._base_kwargs["content"] = self.page_string
-            else:
-                if not self.page_string in self._base_kwargs["content"]:
-                    self._base_kwargs["content"] += f"\n\n{self.page_string}"
+    async def stop_paginator(self) -> None:
+        """Stops the paginator.
+        
+        This method does the following checks (in order):
+        - If :attr:`.BaseClassPaginator.message` is not ``None``, it does the following:
+            - If :attr:`.BaseClassPaginator.delete_after` is ``True``, it deletes the message.
+            - If :attr:`.BaseClassPaginator.disable_after` is ``True``, it disables the view.
+            - If :attr:`.BaseClassPaginator.clear_buttons_after` is ``True``, it clears the buttons.
+        - It calls :meth:`.BaseClassPaginator.stop`.
+        """
+        if self.message is not None:
+            if self.delete_after:
+                await self.message.delete()
+            elif self.disable_after:
+                await self.message.edit(view=None)
+            elif self.clear_buttons_after:
+                await self.message.edit(view=self)
+        
+        self.stop()
 
-        return self._base_kwargs
+    def get_page(self, page_number: int) -> Union[Page, Sequence[Page]]:
+        """Gets the page with the given page number.
+        
+        Parameters
+        ----------
+        page_number: int
+            The page number to get.
 
-    def get_page(self, page_number: int) -> Union[Page, list[Page]]:
+        Returns
+        -------
+        Union[Page, Sequence[Page]]
+            The page(s) with the given page number.
+        """
         if page_number < 0 or page_number >= self.max_pages:
-            self._current_page = 0
-            return self.pages[self._current_page]
+            self.current_page = 0
+            return self.pages[self.current_page]
 
         if self.per_page == 1:
             return self.pages[page_number]
@@ -234,123 +273,212 @@ class BaseClassPaginator(Generic[Page, BotT], discord.ui.View):
             base = page_number * self.per_page
             return self.pages[base : base + self.per_page]
 
-    async def interaction_check(self, interaction: InteractionT) -> bool:
-        if self.check:
-            return await maybe_coroutine(self.check, interaction.user.id, interaction=interaction, ctx=self._ctx)
+    def _handle_page_string(self) -> None:
+        if embeds := self.__base_kwargs["embeds"]:
+            for embed in embeds:
+                to_set = self.page_string
+                if footer_text := embed.footer.text:
+                    if "|" in footer_text:
+                        footer_text = footer_text.split("|")[0].strip()
+                        to_set = f"{footer_text} | {self.page_string}"
 
-        if self._interaction is None and self._ctx is None:
-            return True
+                embed.set_footer(text=to_set)
+        elif content := self.__base_kwargs["content"]:
+            self.__base_kwargs["content"] = f"{content}\n{self.page_string}"
+        else:
+            self.__base_kwargs["content"] = self.page_string
 
-        client = interaction.client
-        TO_CHECK: set[Union[int, Any]] = {interaction.user.id}.union(set(getattr(client, "owner_ids", set())))  # pyright: ignore [reportUnknownArgumentType]
-        if getattr(client, "owner_id", None):
-            TO_CHECK.union({client.owner_id})  # type: ignore
+    async def get_page_kwargs(self, _page: Union[Page, Sequence[Page]], /, skip_formatting: bool = False) -> BaseKwargs:
+        """Gets the kwargs to send the page with.
+        
+        Parameters
+        ----------
+        page: Union[Page, Sequence[Page]]
+            The page to get the kwargs for.
+        skip_formatting: bool
+            Whether to not call :meth:`.BaseClassPaginator.format_page` with the given page.
+            Defaults to ``False``.
 
-        return interaction.user.id in TO_CHECK
+        Returns
+        -------
+        BaseKwargs
+            The kwargs to send the page with.
+        """
+        kwrgs = self.__base_kwargs
+        if not skip_formatting:
+            self.__reset_base_kwargs()
+            page = await self._format_page(_page)
+        else:
+            page = _page
 
-    def format_page(self, page: Union[list[Page], Page]) -> Any:
-        return page
+        # Sequence
+        if isinstance(page, (list, tuple)):
+            for __page in page:
+                # handles the page kwargs
+                await self.get_page_kwargs(__page, skip_formatting=True)  # type: ignore # it's fine, trust me...
 
-    async def stop_paginator(self) -> None:
-        self.stop()
-        if not self.message:
-            return
+        if isinstance(page, (int, str)):
+            kwrgs["content"] = str(page)
+        elif isinstance(page, discord.Embed):
+            kwrgs["embeds"].append(page)  # type: ignore
+        elif isinstance(page, (discord.File, discord.Attachment)):
+            if isinstance(page, discord.Attachment):
+                page = await page.to_file()  # type: ignore
+            if not "files" in kwrgs:
+                kwrgs["files"] = [page]  # type: ignore
+            else:
+                kwrgs["files"].append(page)  # type: ignore
+        elif isinstance(page, dict):
+            kwrgs.update(page.copy())  # type: ignore
 
-        if self.delete_after:
-            try:
-                await self.message.delete()
-            except (discord.NotFound, discord.Forbidden):
-                pass
-            return
 
-        if self.clear_buttons_after:
-            await self._edit_message(view=None)
-        elif self.disable_after:
-            for button in self.children:
-                button.disabled = True  # type: ignore
-
-            await self._edit_message(view=self)
-            return
-
-    async def on_timeout(self) -> None:
-        await self.stop_paginator()
-
+        self._handle_page_string()
+        return kwrgs
+    
     async def _edit_message(self, interaction: Optional[InteractionT] = None, /, **kwargs: Any) -> None:
+        """Edits the message with the given kwargs.
+        
+        Parameters
+        ----------
+        interaction: Optional[:class:`discord.Interaction`]
+            The interaction to edit.
+            If ``None``, :attr:`.BaseClassPaginator.message` is used, if that's ``None``, a :exc:`ValueError` is raised.
+            Defaults to ``None``.
+        **kwargs: Any
+            The kwargs to edit the message with.
+
+        Raises
+        ------
+        ValueError
+            If ``interaction`` is ``None`` and :attr:`.BaseClassPaginator.message` is ``None``.
+        """
+        kwargs.pop("ephemeral", None)
+        kwargs["attachments"] = kwargs.pop("files", [])
+
         if interaction is not None:
-            self._interaction = interaction
-
-        to_call: Optional[Callable[..., Coroutine[Any, Any, Any]]] = None
-        if self._interaction:
-            to_call = self._interaction.response.edit_message
-            if self._interaction.response.is_done():
-                if not self._interaction.message:
-                    to_call = self._interaction.edit_original_response
-                else:
-                    to_call = self._interaction.message.edit
-
+            if interaction.response.is_done() and interaction.message:
+                await interaction.message.edit(**kwargs)
+            else:
+                await interaction.response.edit_message(**kwargs)
         elif self.message:
-            to_call = self.message.edit
+            await self.message.edit(**kwargs)
         else:
             ValueError("No interaction or message to edit.")
 
-        _kwargs = kwargs.copy()
-        _kwargs.pop("ephemeral", None)
-        if to_call is not None:
-            await to_call(**_kwargs)
-
         if self.is_finished():
             self.message = None
+            await self.stop_paginator()
+
+    async def switch_page(self, interaction: Optional[InteractionT], page_number: int) -> None:
+        """Switches the page to the given page number.
+        
+        Parameters
+        ----------
+        page_number: int
+            The page number to switch to.
+        """
+        self.current_page = page_number
+        page = self.get_page(self.current_page)
+        page_kwargs = await self.get_page_kwargs(page)
+        await self._edit_message(interaction, **page_kwargs)
+
+    @overload
+    async def send(
+        self,
+        destination: Destination,
+        *,
+        override_page_kwargs: bool = ...,
+        edit_message: Literal[True] = ...,
+        **send_kwargs: Any,
+    ) -> None:
+        ...
+
+    @overload
+    async def send(
+        self,
+        destination: Destination,
+        *,
+        override_page_kwargs: bool = ...,
+        edit_message: Literal[False] = ...,
+        **send_kwargs: Any,
+    ) -> discord.Message:
+        ...
+
+    @overload
+    async def send(
+        self,
+        destination: Destination,
+        *,
+        override_page_kwargs: Literal[False] = ...,
+        edit_message: bool = ...,
+    ) -> Optional[discord.Message]:
+        ...
+
+    @overload
+    async def send(
+        self,
+        destination: Destination,
+        *,
+        override_page_kwargs: Literal[True] = ...,
+        edit_message: bool = ...,
+        **send_kwargs: Any,
+    ) -> Optional[discord.Message]:
+        ...
 
     async def send(
         self,
+        destination: Destination,
         *,
-        ctx: Optional[ContextT] = None,
-        send_to: Optional[Messageable] = None,
-        interaction: Optional[InteractionT] = None,
-        override_custom: bool = False,
-        force_send: bool = False,
-        **kwargs: Any,
-    ) -> PossibleMessage:
-        raise NotImplementedError("send must be implemented in a subclass.")
+        override_page_kwargs: bool = False,
+        edit_message: bool = False,
+        **send_kwargs: Any,
+    ) -> Optional[discord.Message]:
+        """Sends the message to the given destination.
+        
+        Parameters
+        ----------
+        destination: Union[:class:`discord.abc.Messageable`, :class:`discord.Interaction`]
+            The destination to send the message to. Handles responding to the interaction if given.
+        override_page_kwargs: bool
+            Whether to override the page kwargs wuth the given kwargs to ``send_kwargs``.
+            Defaults to ``False``.
+        edit_message: bool
+            Whether to edit the message instead of sending a new one.
+            Defaults to ``False``.
+        **send_kwargs: Any
+            The kwargs to pass to the destination's send method. Only used if ``override_page_kwargs`` is ``True``.
 
-    async def _handle_send(  
+        Returns
+        -------
+        Optional[:class:`PossibleMessage`]
+            The message or response sent.
+        """
+        return await self._send(destination, override_page_kwargs=override_page_kwargs, edit_message=edit_message, **send_kwargs)
+
+    async def _send(
         self,
-        page: Any,
+        destination: Destination,
         *,
-        ctx: Optional[ContextT] = None,
-        send_to: Optional[Messageable] = None,
-        interaction: Optional[InteractionT] = None,
-        override_custom: bool = False,
-        force_send: bool = False,
-        **kwargs: Any,
-    ) -> Optional[PossibleMessage]:
-        if ctx and interaction:
-            raise ValueError("ctx and interaction cannot be both set.")
+        override_page_kwargs: bool = False,
+        edit_message: bool = False,
+        **send_kwargs: Any,
+    ) -> Optional[discord.Message]:
+        page = self.get_page(self.current_page)
+        page_kwargs: dict[str, Any] = await self.get_page_kwargs(page)  # type: ignore # it's fine.
+        if override_page_kwargs:
+            page_kwargs |= send_kwargs
 
-        self._interaction = interaction or self._interaction
-        self._ctx = ctx or self._ctx  # type: ignore
-        send_kwargs = await self.get_kwargs_from_page(page, send_kwargs=kwargs if override_custom else {})
+        if edit_message:
+            return await self._edit_message(destination if isinstance(destination, discord.Interaction) else None, **page_kwargs)
 
-        if self.message is not None and not force_send:
-            await self._edit_message(self._interaction, **send_kwargs)
-            return
-
-        if send_to is not None:
-            self.message = await send_to.send(**send_kwargs)  # type: ignore
-            return self.message  # type: ignore
-
-        elif self._interaction is not None:
-            if self._interaction.response.is_done():
-                send_kwargs["wait"] = True
-                self.message = await self._interaction.followup.send(**send_kwargs)  # type: ignore
+        elif isinstance(destination, discord.Interaction):
+            if destination.response.is_done():
+               self.message = await destination.followup.send(**page_kwargs, wait=True)
             else:
-                await self._interaction.response.send_message(**send_kwargs)  # type: ignore
-                self.message = await interaction.original_response()  # type: ignore
-
-        elif self._ctx is not None:
-            self.message = await self._ctx.send(**send_kwargs)  # type: ignore
+                await destination.response.edit_message(**page_kwargs)
+                self.message = await destination.original_response()
 
         else:
-            raise ValueError("ctx or interaction or send_to must be provided")
+            self.message = await destination.send(**page_kwargs) 
 
-        return self.message  # type: ignore
+        return self.message

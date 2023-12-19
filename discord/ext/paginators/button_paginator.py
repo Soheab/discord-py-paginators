@@ -4,22 +4,26 @@ from typing import (
     Any,
     Literal,
     Optional,
-    Union,
+    Sequence,
+    Union
 )
 
 from discord import ButtonStyle, Emoji, PartialEmoji
+import discord
 from discord.ui import Button, Modal, TextInput
 
 from .base_paginator import BaseClassPaginator
-from ._types import BotT, Page, InteractionT, ContextT
+from ._types import Page
 
 if TYPE_CHECKING:
-    from ._types import Page, PossibleMessage
+    from typing_extensions import Unpack
 
-    from discord.abc import Messageable
+    from ._types import InteractionT, BasePaginatorKwargs
+
 
     ValidButtonKeys = Literal["FIRST", "LEFT", "RIGHT", "LAST", "STOP", "PAGE_INDICATOR"]
     ValidButtonsDict = dict[ValidButtonKeys, "PaginatorButton"]
+
 
 __all__: tuple[str, ...] = ("ButtonPaginator", "PaginatorButton")
 
@@ -33,7 +37,7 @@ class ChooseNumber(Modal):
         min_length=1,
     )
 
-    def __init__(self, paginator: ButtonPaginator[Any, Any], /, **kwargs: Any) -> None:
+    def __init__(self, paginator: ButtonPaginator[Any], /, **kwargs: Any) -> None:
         super().__init__(
             title="Which page would you like to go to?",
             timeout=paginator.timeout,
@@ -48,7 +52,11 @@ class ChooseNumber(Modal):
         self.value: Optional[int] = None
 
     async def on_submit(self, interaction: InteractionT) -> None:
-        assert isinstance(self.number_input.value, str)
+        # can't happen but type checker
+        if not self.number_input.value:
+            await interaction.response.send_message("Please enter a number!", ephemeral=True)
+            self.stop()
+            return
 
         if (
             not self.number_input.value.isdigit()
@@ -69,12 +77,33 @@ class ChooseNumber(Modal):
             return
 
         self.value = number
-        await interaction.response.send_message(f"There is page {self.value + 1} for you <3", ephemeral=True)
+        await interaction.response.defer()
+       # await interaction.response.send_message(f"There is page {self.value + 1} for you <3", ephemeral=True)
         self.stop()
 
 
-class PaginatorButton(Button["ButtonPaginator[Any, Any]"]):
-    view: ButtonPaginator[Any, Any]  # pyright: ignore [reportIncompatibleMethodOverride] # this is better
+class PageSwitcherAndStopButtonView(discord.ui.View):
+    def __init__(self, paginator: ButtonPaginator[Any]) -> None:
+        super().__init__(timeout=paginator.timeout)
+
+        self.paginator: ButtonPaginator[Any] = paginator
+
+    @discord.ui.button(label="Stop Paginator", style=discord.ButtonStyle.danger, custom_id="paginator:button:stop")
+    async def stop_paginator(self, interaction: InteractionT, _: discord.ui.Button[PageSwitcherAndStopButtonView]) -> None:
+        ...
+
+    @discord.ui.button(label="Switch Page", style=discord.ButtonStyle.blurple, custom_id="paginator:button:switch_page")
+    async def switch_page(self, interaction: InteractionT, _: discord.ui.Button[PageSwitcherAndStopButtonView]) -> None:
+        modal = ChooseNumber(self.paginator)
+        await interaction.response.send_modal(modal)
+        await modal.wait()
+        if modal.value is not None:
+            self.paginator.current_page = modal.value
+            await self.paginator.switch_page(interaction, self.paginator.current_page)
+
+
+class PaginatorButton(Button["ButtonPaginator[Any]"]):
+    view: ButtonPaginator[Any]  # type: ignore # it's correct.
 
     def __init__(
         self,
@@ -86,7 +115,7 @@ class PaginatorButton(Button["ButtonPaginator[Any, Any]"]):
         row: Optional[int] = None,
         disabled: bool = False,
         position: Optional[int] = None,
-    ):
+    ) -> None:
         super().__init__(emoji=emoji, label=label, custom_id=custom_id, style=style, row=row, disabled=disabled)
         self.position: Optional[int] = position
 
@@ -96,36 +125,29 @@ class PaginatorButton(Button["ButtonPaginator[Any, Any]"]):
         await modal.wait()
         return modal.value
 
-    async def callback(self, interaction: InteractionT) -> None: 
-        self.view._interaction = interaction # idc
-
+    async def callback(self, interaction: InteractionT) -> None:
         if self.custom_id == "stop_button":
             await self.view.stop_paginator()
             return
 
         if self.custom_id == "right_button":
-            self.view._current_page += 1
+            self.view.current_page += 1
         elif self.custom_id == "left_button":
-            self.view._current_page -= 1
+            self.view.current_page -= 1
         elif self.custom_id == "first_button":
-            self.view._current_page = 0
+            self.view.current_page = 0
         elif self.custom_id == "last_button":
-            self.view._current_page = self.view.max_pages - 1
+            self.view.current_page = self.view.max_pages - 1
         elif self.custom_id == "page_indicator_button":
             new_page = await self.__handle_modal(interaction)
             if new_page is not None:
-                self.view._current_page = new_page
+                self.view.current_page = new_page
             else:
                 return
 
-        self.view._update_buttons_state()
-        pages = self.view.get_page(self.view._current_page)
-        edit_kwargs = (await self.view.get_kwargs_from_page(pages)).copy()
-        edit_kwargs["attachments"] = edit_kwargs.pop("files", [])
-        await self.view._edit_message(interaction, **edit_kwargs)
+        await self.view.switch_page(interaction, self.view.current_page)
 
-
-class ButtonPaginator(BaseClassPaginator[Page, BotT]):
+class ButtonPaginator(BaseClassPaginator[Page]):
     FIRST: Optional[PaginatorButton] = None  # filled in __add_buttons
     LEFT: Optional[PaginatorButton] = None  # filled in __add_buttons
     RIGHT: Optional[PaginatorButton] = None  # filled in __add_buttons
@@ -135,11 +157,11 @@ class ButtonPaginator(BaseClassPaginator[Page, BotT]):
 
     def __init__(
         self,
-        pages: list[Page],
+        pages: Sequence[Page],
         *,
         buttons: ValidButtonsDict = {},
         always_show_stop_button: bool = False,
-        **kwargs: Any,
+        **kwargs: Unpack[BasePaginatorKwargs],
     ) -> None:
         """Initialize the Paginator."""
         super().__init__(pages, **kwargs)
@@ -185,9 +207,7 @@ class ButtonPaginator(BaseClassPaginator[Page, BotT]):
             self.stop()
             return
 
-        _buttons: dict[str, PaginatorButton] = {
-            name: button for name, button in self._buttons.items() if button
-        }
+        _buttons: dict[str, PaginatorButton] = {name: button for name, button in self._buttons.items() if button}
         sorted_buttons = sorted(_buttons.items(), key=lambda b: b[1].position if b[1].position is not None else 0)
         for name, button in sorted_buttons:
             CUSTOM_ID = f"{name.lower()}_button"
@@ -217,7 +237,9 @@ class ButtonPaginator(BaseClassPaginator[Page, BotT]):
     def _update_buttons_state(self) -> None:
         button: PaginatorButton
         for button in self.children:  # type: ignore
-            assert button.custom_id, "Something went wrong... button.custom_id is None"
+            # type checker
+            if not button.custom_id:
+                raise ValueError("Something went wrong... button.custom_id is None")
 
             if button.custom_id in ("page_indicator_button", "stop_button"):
                 if button.custom_id == "page_indicator_button":
@@ -243,24 +265,3 @@ class ButtonPaginator(BaseClassPaginator[Page, BotT]):
     def current_page(self, value: int) -> None:
         self._current_page = value
         self._update_buttons_state()
-
-    async def send(  # type: ignore[override]
-        self,
-        *,
-        ctx: Optional[ContextT] = None,
-        send_to: Optional[Messageable] = None,
-        interaction: Optional[InteractionT] = None,
-        override_custom: bool = False,
-        force_send: bool = False,
-        **kwargs: Any,
-    ) -> Optional[PossibleMessage]:
-        page = self.get_page(self.current_page)
-        return await super()._handle_send(
-            page,
-            ctx=ctx,
-            send_to=send_to,
-            interaction=interaction,
-            force_send=force_send,
-            override_custom=override_custom,
-            **kwargs,
-        )
