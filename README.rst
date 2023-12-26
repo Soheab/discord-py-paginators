@@ -7,15 +7,6 @@ Welcome to discord-py-paginators's documentation!
 =================================================
 Extension for discord.py that provides various paginators.
 
-.. toctree::
-   :caption: API Reference
-   :maxdepth: 2
-
-   paginators
-   types
-   errors
-   base
-
 Installation
 ============= 
 
