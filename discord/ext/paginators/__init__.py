@@ -1,1 +1,4 @@
-__version__ = "1.0.0"
+"""Extension for discord.py that provides various paginators."""
+
+__author__ = "Soheab_"
+__version__ = "0.0.1"

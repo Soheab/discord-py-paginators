@@ -8,7 +8,6 @@ from typing import (
     Sequence,
     TypedDict,
     Union,
-    TypeVar,
 )
 
 import discord
@@ -18,27 +17,36 @@ if TYPE_CHECKING:
 
     from .base_paginator import BaseClassPaginator
 
+    BaseClassPaginator = BaseClassPaginator[Any]
+else:
+    Self = NotRequired = BaseClassPaginator = Any
+
 if TYPE_CHECKING:
     from typing_extensions import TypeVar
 
     ClientT = TypeVar("ClientT", bound=discord.Client, covariant=True, default=discord.Client)
 else:
+    from typing import TypeVar 
     ClientT = TypeVar("ClientT", bound=discord.Client, covariant=True)  # type: ignore
 
+from typing import TypeVar  # F811 Redefinition of unused `TypeVar`
 
-InteractionT = discord.Interaction[ClientT]
-PaginatorT = TypeVar("PaginatorT", bound="BaseClassPaginator[Any]")
-PaginatorCheck = Callable[[PaginatorT, InteractionT], Union[bool, Coroutine[Any, Any, bool]]]
-Destination = Union[discord.abc.Messageable, InteractionT]
+Interaction = discord.Interaction[ClientT]
+PaginatorT = TypeVar("PaginatorT", bound="BaseClassPaginator")
+PaginatorCheck = Callable[[PaginatorT, Interaction], Union[bool, Coroutine[Any, Any, bool]]]
+Destination = Union[discord.abc.Messageable, Interaction]
 
-# fmt: off
-PossiblePage = Union[
+_PossiblePages = Union[
     str,
     discord.Embed,
     discord.File,
     discord.Attachment,
     dict[str, Any],
-    Sequence["PossiblePage"],
+]
+# fmt: off
+PossiblePage = Union[
+    _PossiblePages,
+    Sequence[_PossiblePages],
     Any,
 ]
 # fmt: on
@@ -46,15 +54,21 @@ PossiblePage = Union[
 Page = TypeVar("Page", bound=PossiblePage)
 
 
-
 class BaseKwargs(TypedDict):
     content: Optional[str]
+    """Content of the page."""
     embeds: list[discord.Embed]
+    """Embeds of the page."""
     view: Self
+    """View of the page. (the paginator)"""
 
     files: NotRequired[list[discord.File]]
+    """Files of the page. Not always available like when using `edit`."""
     attachments: NotRequired[list[discord.File]]  # used in edit over files
+    """Attachments of the page. Not always available, probably only when using `edit`."""
     wait: NotRequired[bool]  # webhook/followup
+    """Whether to wait for the webhook message to be sent and returned. Only used ``Webhook.send``."""
+
 
 class BasePaginatorKwargs(TypedDict):
     check: NotRequired[Optional[PaginatorCheck[Any]]]  # default: None

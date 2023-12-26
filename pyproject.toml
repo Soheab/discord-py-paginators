@@ -1,5 +1,5 @@
 [build-system]
-requires      = ["setuptools>=61.0.0", "wheel"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -21,21 +21,31 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 
+[project.urls]
+Documentation = "https://discord-py-paginators.readthedocs.io/"
+Github = "https://github.com/Soheab/discord-py-paginators"
+Discord = "https://discord.gg/yCzcfju"
+
 [project.optional-dependencies]
-dev = ["black", "ruff", "typing_extensions"]
+docs = [
+    "sphinx>=7.0.0,<8.0.0",
+    "furo>=2023.9.10,<2024.0.0", # theme // https://pradyunsg.me/furo/customisation/announcement/
+    "sphinx-autodoc-typehints>=1.25.0,<2.0.0",  # https://github.com/tox-dev/sphinx-autodoc-typehints
+    "sphinx-toolbox>=3.5,<4.0",  # https://sphinx-toolbox.readthedocs.io/en/latest/extensions/index.html
+]
+dev = ["black", "ruff", "typing_extensions", "pyright"]
 modalpaginator = ["discord-ext-modal-paginator"]
 
 [tool.setuptools]
 packages = ["discord", "discord.ext", "discord.ext.paginators"]
 
-
 [tool.setuptools.dynamic]
 version = { attr = "discord.ext.paginators.__version__" }
-readme = { file = ["README.md"], content-type = "text/markdown" }
+readme = { file = ["README.rst"], content-type = "text/x-rst" }
 
 [tool.pyright]
 include = ["discord.ext.paginators"]
-exclude = ["**/__pycache__", "_build", "build", "dist", "docs"]
+exclude = ["**/__pycache__", "_build", "build", "dist", "docs", "**/legacy"]
 reportUnnecessaryTypeIgnoreComment = "warning"
 reportUnusedImport = "error"
 pythonVersion = "3.9"
@@ -50,3 +60,48 @@ exclude_lines = ["pragma: no cover", "@overload"]
 
 [tool.black]
 line-length = 120
+
+# https://beta.ruff.rs/docs/settings/
+[tool.ruff]
+fix = true # default: false
+line-length = 120 # default: 88
+include = ["discord", "discord.ext", "discord.ext.modal_paginator"]
+exclude = ["**/__pycache__", "_build", "build", "dist", "docs", ]
+target-version = "py39"  # default: "py38"
+
+[tool.ruff.flake8-annotations]
+allow-star-arg-any = true # default: false
+ignore-fully-untyped = true  # default: false
+suppress-dummy-args = true # default: false
+
+[tool.ruff.flake8-bandit]
+check-typed-exception = true  # default: false
+
+[tool.ruff.flake8-comprehensions]
+allow-dict-calls-with-keyword-arguments = true  # default: false
+
+[tool.ruff.flake8-type-checking]
+strict = true
+
+[tool.ruff.flake8-unused-arguments]
+ignore-variadic-names = true
+
+[tool.ruff.isort]
+case-sensitive = true  # default: false
+combine-as-imports = true  # default: false 
+force-sort-within-sections = true  # default: false
+force-to-top = ["future", "typing"]  # default: []
+force-wrap-aliases = true  # default: false
+required-imports = ["from __future__ import annotations"]  # default: []
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]  # default
+
+[tool.ruff.pydocstyle]
+convention = "numpy"  # default: none
+ignore-decorators = ["typing.overload"]  # default: []
+
+[tool.ruff.pylint]
+max-args = 20  # default: 5 # lets not limit ourselves :)
+
+[tool.ruff.pyupgrade]
+# Preserve types, even if a file imports `from __future__ import annotations`.
+keep-runtime-typing = true  # default: false
