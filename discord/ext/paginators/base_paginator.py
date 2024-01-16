@@ -486,7 +486,7 @@ class BaseClassPaginator(discord.ui.View, Generic[Page]):
             if destination.response.is_done():
                 self.message = await destination.followup.send(**page_kwargs, wait=True)
             else:
-                await destination.response.edit_message(**page_kwargs)
+                await destination.response.send_message(**page_kwargs)
                 self.message = await destination.original_response()
 
         else:
