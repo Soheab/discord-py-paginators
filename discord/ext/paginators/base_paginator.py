@@ -335,7 +335,7 @@ class BaseClassPaginator(discord.ui.View, Generic[Page]):
             self.__base_kwargs.update(page.copy())  # type: ignore
 
         self._handle_page_string()
-        return kwrgs
+        return self.__base_kwargs
 
     def _disable_all_children(self) -> None:
         for child in self.children:
