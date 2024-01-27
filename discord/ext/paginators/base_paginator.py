@@ -305,7 +305,6 @@ class BaseClassPaginator(discord.ui.View, Generic[Page]):
         :class:`.BaseKwargs`
             The kwargs to send the page with.
         """
-        kwrgs = self.__base_kwargs
         if not skip_formatting:
             self.__reset_base_kwargs()
             page = await self._format_page(_page)
@@ -319,18 +318,21 @@ class BaseClassPaginator(discord.ui.View, Generic[Page]):
                 await self.get_page_kwargs(__page, skip_formatting=True)  # type: ignore # it's fine, trust me...
 
         if isinstance(page, (int, str)):
-            kwrgs["content"] = str(page)
+            if self.__base_kwargs["content"]:
+                self.__base_kwargs["content"] += str(page)
+            else:
+                self.__base_kwargs["content"] = str(page)
         elif isinstance(page, discord.Embed):
-            kwrgs["embeds"].append(page)
+            self.__base_kwargs["embeds"].append(page)
         elif isinstance(page, (discord.File, discord.Attachment)):
             if isinstance(page, discord.Attachment):
                 page = await page.to_file()
             if "files" not in kwrgs:
-                kwrgs["files"] = [page]
+                self.__base_kwargs["files"] = [page]
             else:
-                kwrgs["files"].append(page)
+                self.__base_kwargs["files"].append(page)
         elif isinstance(page, dict):
-            kwrgs.update(page.copy())  # type: ignore
+            self.__base_kwargs.update(page.copy())  # type: ignore
 
         self._handle_page_string()
         return kwrgs
