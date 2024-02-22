@@ -234,7 +234,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         return res
 
     def get_page(self, page_number: int) -> Union[PageT, Sequence[PageT]]:
-        page: Sequence[PaginatorOption[PageT]] = super().get_page(page_number)   # type: ignore # it's a list of PaginatorOption
+        page: Sequence[PaginatorOption[PageT]] = super().get_page(page_number)  # type: ignore # it's a list of PaginatorOption
 
         option: PaginatorOption[PageT] = page[self.current_option_index]
         option.default = True

@@ -65,7 +65,7 @@ line-length = 125
 # https://beta.ruff.rs/docs/settings/
 [tool.ruff]
 fix = true # default: false
-line-length = 120 # default: 88
+line-length = 125 # default: 88
 include = ["discord", "discord.ext", "discord.ext.modal_paginator"]
 exclude = ["**/__pycache__", "_build", "build", "dist", "docs", ]
 target-version = "py39"  # default: "py38"

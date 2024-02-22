@@ -42,7 +42,12 @@ def _check_parameters_amount(func: Callable[..., Any], amounts: tuple[int, ...],
     parameters = inspect.signature(func).parameters
     return len(parameters) in amounts
 
-async def _call_and_ignore(functions: list[Callable[..., Any]], *args: Any, **kwargs: Any,) -> Tuple[bool, Optional[Exception]]: # type: ignore # unused
+
+async def _call_and_ignore(  # type: ignore # unused
+    functions: list[Callable[..., Any]],
+    *args: Any,
+    **kwargs: Any,
+) -> Tuple[bool, Optional[Exception]]:
     for function in functions[:-1]:
         try:
             await function(*args, **kwargs)
@@ -50,10 +55,8 @@ async def _call_and_ignore(functions: list[Callable[..., Any]], *args: Any, **kw
             pass
         else:
             return True, None
-        
 
     try:
         return await functions[-1]()
     except Exception as e:
         return False, e
-

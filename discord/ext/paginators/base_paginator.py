@@ -19,6 +19,7 @@ else:
 
 __all__ = ("BaseClassPaginator",)
 
+
 class BaseClassPaginator(discord.ui.View, Generic[PageT]):
     """Base class for all paginators.
 
@@ -34,11 +35,11 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         - :class:`.discord.Attachment`: Calls :meth:`~discord.Attachment.to_file()` and appends it to the files of the message.
         - :class:`dict`: Will be updated with the kwargs of the message.
         - Sequence[Any]: Will be flattened and each entry will be handled as above.
-        
+
         Sequence = List, Tuple, etc.
 
         Any other types will probably be ignored.
-        This attribute *should* be able to be set after the paginator is created. 
+        This attribute *should* be able to be set after the paginator is created.
         Aka, hotswapping the pages.
     per_page: :class:`int`
         The amount of pages to display per page.
@@ -80,7 +81,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         If the page is an embed, it will be appended to the footer text.
         If the page is a string, it will be appended to the string.
         else, it will be set as the content of the message.
-        
+
     timeout: Optional[Union[:class:`int`, :class:`float`]]
         The timeout for the paginator.
         Defaults to ``180.0``.
@@ -147,7 +148,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
     def _reset_base_kwargs(self) -> None:
         """Resets the base kwargs.
-        
+
         This sets the base kwargs to ``{"content": None, "embeds": [], "view": self}``.
         """
         self.__base_kwargs: BaseKwargs = {"content": None, "embeds": [], "view": self}
@@ -259,15 +260,25 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         success: bool = False
         if self.delete_after:
             error_message: str = "Failed to delete the message. in {cls.__name__}.stop_paginator.\nError: {0}"
-            to_call = [self.message.delete,] if self.message else []
+            to_call = (
+                [
+                    self.message.delete,
+                ]
+                if self.message
+                else []
+            )
             if interaction:
-                to_call = [interaction.delete_original_response,] + to_call
+                to_call = [
+                    interaction.delete_original_response,
+                ] + to_call
                 if not interaction.response.is_done():
                     await interaction.response.defer()
                 if interaction.message:
                     to_call.insert(1, interaction.message.delete)
 
-            success, error = await _utils._call_and_ignore(to_call, )
+            success, error = await _utils._call_and_ignore(
+                to_call,
+            )
             if not success:
                 logging.debug(error_message.format(self.__class__, error))
 
@@ -280,10 +291,18 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
             else:
                 self._disable_all_children()
 
-            to_call: list[Callable[..., Any]] = [self.message.edit,] if self.message else []
+            to_call: list[Callable[..., Any]] = (
+                [
+                    self.message.edit,
+                ]
+                if self.message
+                else []
+            )
             error_message = "Failed to edit the message. in {cls.__name__}.stop_paginator.\nError: {0}"
             if interaction:
-                to_call = [interaction.edit_original_response,] + to_call
+                to_call = [
+                    interaction.edit_original_response,
+                ] + to_call
                 if not interaction.response.is_done():
                     to_call.insert(0, interaction.response.edit_message)
                 if interaction.message:
@@ -382,7 +401,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
                 file = await page.to_file()
             else:
                 file = page
-                
+
             if "files" not in self.__base_kwargs:
                 self.__base_kwargs["files"] = [file]
             else:

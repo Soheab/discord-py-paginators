@@ -45,7 +45,7 @@ class ChooseNumber(Modal):
         # type checker
         if not self.number_input.placeholder:
             self.number_input.placeholder = f"Current: {paginator.current_page + 1}"
-        else: 
+        else:
             self.number_input.placeholder = self.number_input.placeholder.format(paginator.current_page + 1)
 
         self.value: Optional[int] = None
@@ -287,19 +287,21 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
             "LAST": PaginatorButton(label="Last", position=4),
             "STOP": PaginatorButton(label="Stop", style=ButtonStyle.danger, position=5),
         }
-        
+
         self._buttons: dict[ValidButtonKeys, PaginatorButton] = DEFAULT_BUTTONS.copy()
         if buttons:
-            valid_keys = ', '.join(DEFAULT_BUTTONS.keys())
+            valid_keys = ", ".join(DEFAULT_BUTTONS.keys())
             error_message = (
                 f"buttons must be a dictionary of keys: {valid_keys} and PaginatorButton or None "
                 "to remove the button as the value. Or don't specify the kwarg to use the default buttons."
             )
-            if not isinstance(buttons, dict) \
-                or not any(k not in DEFAULT_BUTTONS for k in buttons) \
-                or not all(not v or isinstance(v, PaginatorButton) for v in buttons.values()):
+            if (
+                not isinstance(buttons, dict)
+                or not any(k not in DEFAULT_BUTTONS for k in buttons)
+                or not all(not v or isinstance(v, PaginatorButton) for v in buttons.values())
+            ):
                 raise TypeError(error_message)
-            
+
             self._buttons.update(buttons)
 
         self._stop_button_and_page_switcher_view: Optional[PageSwitcherAndStopButtonView] = (
@@ -360,7 +362,6 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
                     continue
                 else:
                     if button.custom_id == "first_button":
-
                         button.label = f"1 {button.label}"
                     else:
                         button.label = f"{button.label} {self.max_pages}"
