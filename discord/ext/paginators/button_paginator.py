@@ -1,12 +1,13 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+from collections.abc import Sequence
 
 from discord import ButtonStyle, Emoji, PartialEmoji
 import discord
 from discord.ui import Button, Modal, TextInput
 
 from .base_paginator import BaseClassPaginator
-from ._types import Page
+from ._types import PageT
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack
@@ -16,6 +17,7 @@ if TYPE_CHECKING:
     ValidButtonKeys = Literal["FIRST", "LEFT", "RIGHT", "LAST", "STOP", "PAGE_INDICATOR"]
     ValidButtonsDict = dict[ValidButtonKeys, "PaginatorButton"]
 
+    BaseClassPaginator = BaseClassPaginator
 
 __all__: tuple[str, ...] = ("ButtonPaginator", "PaginatorButton")
 
@@ -39,7 +41,12 @@ class ChooseNumber(Modal):
         self.paginator: ButtonPaginator[Any] = paginator
         self.number_input.max_length = paginator.max_pages
         self.number_input.label = self.number_input.label.format(paginator.max_pages)
-        self.number_input.placeholder = self.number_input.placeholder.format(paginator.current_page + 1)  # type: ignore
+
+        # type checker
+        if not self.number_input.placeholder:
+            self.number_input.placeholder = f"Current: {paginator.current_page + 1}"
+        else: 
+            self.number_input.placeholder = self.number_input.placeholder.format(paginator.current_page + 1)
 
         self.value: Optional[int] = None
 
@@ -70,7 +77,6 @@ class ChooseNumber(Modal):
 
         self.value = number
         await interaction.response.defer()
-        # await interaction.response.send_message(f"There is page {self.value + 1} for you <3", ephemeral=True)
         self.stop()
 
 
@@ -78,19 +84,15 @@ class PageSwitcherAndStopButtonView(discord.ui.View):
     STOP: Optional[Button["ButtonPaginator[Any]"]] = None  # filled in _add_buttons
     PAGE_INDICATOR: Optional[Button["ButtonPaginator[Any]"]] = None  # filled in _add_buttons
 
-    _paginator: ButtonPaginator[Any]  # filled in _add_buttons
-
     def __init__(self, paginator: ButtonPaginator[Any], /) -> None:
         super().__init__(timeout=paginator.timeout)
 
     def _add_buttons(self, paginator: ButtonPaginator[Any], /) -> None:
         self._paginator: ButtonPaginator[Any] = paginator
         if not any(key in ("STOP", "PAGE_INDICATOR") for key in paginator._buttons):
-            raise ValueError(
-                "STOP and PAGE_INDICATOR buttons are required if combine_switcher_and_stop_button is True."
-            )
+            raise ValueError("STOP and PAGE_INDICATOR buttons are required if combine_switcher_and_stop_button is True.")
 
-        org_page_indicator_button = paginator._buttons["PAGE_INDICATOR"]
+        org_page_indicator_button: PaginatorButton = paginator._buttons["PAGE_INDICATOR"]
         page_indicator_button = PaginatorButton(
             label="Switch Page",
             emoji=org_page_indicator_button.emoji,
@@ -133,24 +135,22 @@ class PageSwitcherAndStopButtonView(discord.ui.View):
         await self._paginator.switch_page(None, self._paginator.current_page)
 
 
-class PaginatorButton(Button["ButtonPaginator[Any]"]):
+class PaginatorButton(Button[Union["ButtonPaginator[Any]", PageSwitcherAndStopButtonView]]):
     """A button for the paginator.
 
     This class has a few parameters that differ from the base button.
-    This can can be used passed to the ``buttons`` parameter in :class:`ButtonPaginator`
+    This can can be used passed to the ``buttons`` parameter in :class:`.ButtonPaginator`
     to customize the buttons used.
 
     See other parameters on :class:`discord.ui.Button`.
 
     Parameters
     -----------
-    position: Optional[int]
+    position: Optional[:class:`int`]
         The position of the button. Defaults to ``None``.
         If not specified, the button will be placed in the order they were added
         or whatever order discord.py adds them in.
     """
-
-    view: ButtonPaginator[Any]  # type: ignore # it's correct.
 
     def __init__(
         self,
@@ -167,6 +167,10 @@ class PaginatorButton(Button["ButtonPaginator[Any]"]):
         self.position: Optional[int] = position
 
     async def callback(self, interaction: Interaction) -> None:
+        # type checker
+        if not self.view:
+            raise ValueError("Something went wrong... button.view is None")
+
         if isinstance(self.view, PageSwitcherAndStopButtonView):
             await self.view.callback(interaction, self)
             return
@@ -184,10 +188,8 @@ class PaginatorButton(Button["ButtonPaginator[Any]"]):
         elif self.custom_id == "last_button":
             self.view.current_page = self.view.max_pages - 1
         elif self.custom_id == "page_indicator_button":
-            if self.view._combine_switcher_and_stop_button and self.view._stop_button_and_page_switcher_view:
-                await interaction.response.send_message(
-                    view=self.view._stop_button_and_page_switcher_view, ephemeral=True
-                )
+            if self.view._stop_button_and_page_switcher_view:
+                await interaction.response.send_message(view=self.view._stop_button_and_page_switcher_view, ephemeral=True)
                 return
 
             new_page = await self.view._handle_modal(interaction)
@@ -199,7 +201,7 @@ class PaginatorButton(Button["ButtonPaginator[Any]"]):
         await self.view.switch_page(interaction, self.view.current_page)
 
 
-class ButtonPaginator(BaseClassPaginator[Page]):
+class ButtonPaginator(BaseClassPaginator[PageT]):
     """A paginator that uses buttons to switch pages.
 
     This class has a few parameters that differ from the base paginator.
@@ -210,13 +212,14 @@ class ButtonPaginator(BaseClassPaginator[Page]):
     - :class:`discord.File`
     - :class:`discord.Attachment`
     - :class:`str`
+    - :class:`dict`
     - :class:`list` or :class:`tuple` of the above
 
     See other parameters on :class:`.BaseClassPaginator`.
 
     Parameters
     ----------
-    buttons: :class:`dict`\\[:class:`str`, :class:`PaginatorButton`]
+    buttons: Dict[:class:`str`, :class:`.PaginatorButton`]
         A dictionary of buttons to use. The keys must be one of the following:
         "FIRST", "LEFT", "RIGHT", "LAST", "STOP", "PAGE_INDICATOR".
         The values must be a PaginatorButton or ``None`` to remove the button.
@@ -246,7 +249,7 @@ class ButtonPaginator(BaseClassPaginator[Page]):
 
         .. note::
             If ``always_show_stop_button`` is ``True``, the ``STOP`` key in ``buttons`` cannot be ``None``.
-    combine_switcher_and_stop_button: bool
+    combine_switcher_and_stop_button: :class:`bool`
         Whether to combine the page switcher and stop button into the paginator indicator which will send another set
         of buttons to switch pages and stop the paginator as an ephemeral message when clicked.
         Defaults to ``False``.
@@ -254,7 +257,7 @@ class ButtonPaginator(BaseClassPaginator[Page]):
         .. note::
             If ``combine_switcher_and_stop_button`` is ``True``, the ``STOP`` and ``PAGE_INDICATOR`` keys in ``buttons`` cannot be ``None``.
     **kwargs: Unpack[:class:`.BasePaginatorKwargs`]
-        See other parameters on :class:`.BaseClassPaginator`.
+        See other parameters on :class:`discord.ext.paginator.base_paginator.BaseClassPaginator`.
     """
 
     FIRST: Optional[PaginatorButton] = None  # filled in __add_buttons
@@ -266,7 +269,7 @@ class ButtonPaginator(BaseClassPaginator[Page]):
 
     def __init__(
         self,
-        pages: Sequence[Page],
+        pages: Sequence[PageT],
         *,
         buttons: ValidButtonsDict = {},
         always_show_stop_button: bool = False,
@@ -284,19 +287,29 @@ class ButtonPaginator(BaseClassPaginator[Page]):
             "LAST": PaginatorButton(label="Last", position=4),
             "STOP": PaginatorButton(label="Stop", style=ButtonStyle.danger, position=5),
         }
-
-        self._style_store: dict[str, ButtonStyle] = {}
-
+        
         self._buttons: dict[ValidButtonKeys, PaginatorButton] = DEFAULT_BUTTONS.copy()
         if buttons:
+            valid_keys = ', '.join(DEFAULT_BUTTONS.keys())
+            error_message = (
+                f"buttons must be a dictionary of keys: {valid_keys} and PaginatorButton or None "
+                "to remove the button as the value. Or don't specify the kwarg to use the default buttons."
+            )
+            if not isinstance(buttons, dict) \
+                or not any(k not in DEFAULT_BUTTONS for k in buttons) \
+                or not all(not v or isinstance(v, PaginatorButton) for v in buttons.values()):
+                raise TypeError(error_message)
+            
             self._buttons.update(buttons)
 
-        self._combine_switcher_and_stop_button: bool = combine_switcher_and_stop_button
-        self._stop_button_and_page_switcher_view: Optional[PageSwitcherAndStopButtonView] = None
-        if self._combine_switcher_and_stop_button:
-            self._stop_button_and_page_switcher_view = PageSwitcherAndStopButtonView(self)
+        self._stop_button_and_page_switcher_view: Optional[PageSwitcherAndStopButtonView] = (
+            PageSwitcherAndStopButtonView(self) if combine_switcher_and_stop_button else None
+        )
 
         self.always_show_stop_button: bool = always_show_stop_button
+        # custom_id: PaginatorButton
+        # filled in __add_buttons
+        self.__buttons_mapping: dict[str, PaginatorButton] = {}
 
         self.__add_buttons()
 
@@ -328,14 +341,14 @@ class ButtonPaginator(BaseClassPaginator[Page]):
             self.stop()
             return
 
-        _buttons: dict[str, PaginatorButton] = {name: button for name, button in self._buttons.items() if button}
+        _buttons: dict[str, PaginatorButton] = {name: button for name, button in self._buttons.copy().items() if button}
         sorted_buttons = sorted(_buttons.items(), key=lambda b: b[1].position if b[1].position is not None else 0)
         for name, button in sorted_buttons:
-            CUSTOM_ID = f"{name.lower()}_button"
-            button.custom_id = CUSTOM_ID
-            self._style_store[CUSTOM_ID] = button.style
+            custom_id = f"{name.lower()}_button"
+            button.custom_id = custom_id
 
             setattr(self, name, button)
+            self.__buttons_mapping[custom_id] = button
 
             if button.custom_id == "page_indicator_button":
                 button.label = self.page_string
@@ -347,23 +360,27 @@ class ButtonPaginator(BaseClassPaginator[Page]):
                     continue
                 else:
                     if button.custom_id == "first_button":
-                        button.label = f"1 {button.label if button.label else ''}"
-                    else:
-                        button.label = f"{button.label if button.label else ''} {self.max_pages}"
 
-            if self._combine_switcher_and_stop_button and button.custom_id == "stop_button":
+                        button.label = f"1 {button.label}"
+                    else:
+                        button.label = f"{button.label} {self.max_pages}"
+
+            if self._stop_button_and_page_switcher_view and button.custom_id == "stop_button":
                 continue
 
             self.add_item(button)
 
-        if self._combine_switcher_and_stop_button and self._stop_button_and_page_switcher_view:
+        if self._stop_button_and_page_switcher_view:
             self._stop_button_and_page_switcher_view._add_buttons(self)
 
         self._update_buttons_state()
 
     def _update_buttons_state(self) -> None:
-        button: PaginatorButton
-        for button in self.children:  # type: ignore
+        for button in self.children:
+            # type checker
+            if not isinstance(button, PaginatorButton):
+                continue
+
             # type checker
             if not button.custom_id:
                 raise ValueError("Something went wrong... button.custom_id is None")
@@ -380,43 +397,17 @@ class ButtonPaginator(BaseClassPaginator[Page]):
 
             if not button.disabled:
                 button.style = ButtonStyle.green
-
-            if button.disabled:
-                button.style = self._style_store[button.custom_id]
-
-    async def stop_paginator(self, interaction: Optional[Interaction] = None) -> None:
-        message = self.message
-        if interaction is not None:
-            if not interaction.response.is_done():
-                if self.disable_after:
-                    self._disable_all_children()
-                    await interaction.response.edit_message(view=self)
-                elif self.clear_buttons_after:
-                    await interaction.response.edit_message(view=None)
-                elif self.delete_after:
-                    if interaction.message is not None:
-                        await interaction.message.delete()
-                    elif self.message:
-                        await interaction.response.defer()
-                        await self.message.delete()
-                else:
-                    await interaction.response.defer()
-
-                self.stop()
-                return
             else:
-                message = interaction.message or self.message
+                original_button = self.__buttons_mapping[button.custom_id]
+                button.style = original_button.style if original_button else ButtonStyle.blurple
 
-        if message is not None:
-            if self.delete_after:
-                await message.delete()
-            elif self.disable_after:
-                self._disable_all_children()
-                await message.edit(view=self)
-            elif self.clear_buttons_after:
-                await message.edit(view=None)
-
-        self.stop()
+            if button.custom_id in ("first_button", "last_button"):
+                original_button = self.__buttons_mapping[button.custom_id]
+                if original_button and original_button.label:
+                    if button.custom_id == "first_button":
+                        button.label = f"1 {original_button.label}"
+                    else:
+                        button.label = f"{original_button.label} {self.max_pages}"
 
     @property
     def current_page(self) -> int:

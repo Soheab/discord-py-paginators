@@ -6,9 +6,9 @@ from typing import (
     Generic,
     Literal,
     Optional,
-    Sequence,
     Union,
 )
+from collections.abc import Sequence
 
 from copy import deepcopy
 import os
@@ -16,7 +16,7 @@ import os
 import discord
 
 from .base_paginator import BaseClassPaginator
-from ._types import Page
+from ._types import PageT
 
 if TYPE_CHECKING:
     from typing_extensions import Self, Unpack
@@ -30,20 +30,22 @@ __all__ = (
 )
 
 
-class PaginatorOption(discord.SelectOption, Generic[Page]):
+class PaginatorOption(discord.SelectOption, Generic[PageT]):
     """A subclass of :class:`discord.SelectOption` representing a page in a :class:`SelectOptionsPaginator`.
 
     Other parameters are the same as :class:`~.discord.SelectOption`.
 
     Parameters
     ----------
-    content: Union[:class:`~discord.ext.paginators._types.Page`, Sequence[:class:`~discord.ext.paginators._types.Page`]]
+    content: Union[Any, Sequence[Any]]
         The content of the page. See :class:`SelectOptionsPaginator` for more the supported types.
+    emoji: Optional[Union[:class:`str`, :class:`discord.Emoji`, :class:`discord.PartialEmoji`]]
+        The emoji to use for the option. Defaults to ``None``.
     """
 
     def __init__(
         self,
-        content: Union[Page, Sequence[Page]],
+        content: Union[PageT, Sequence[PageT]],
         *,
         label: str = discord.utils.MISSING,
         emoji: Optional[Union[str, discord.Emoji, discord.PartialEmoji]] = None,
@@ -51,12 +53,12 @@ class PaginatorOption(discord.SelectOption, Generic[Page]):
         description: Optional[str] = None,
     ) -> None:
         super().__init__(label=label, value=value, description=description, emoji=emoji)
-        self.content: Union[Page, Sequence[Page]] = content
+        self.content: Union[PageT, Sequence[PageT]] = content
 
     @classmethod
-    def from_page(
+    def _from_page(
         cls,
-        page: Page,
+        page: Any,
         copy_from: Optional[discord.SelectOption] = None,
         *,
         label: str = discord.utils.MISSING,
@@ -81,7 +83,7 @@ class PaginatorOption(discord.SelectOption, Generic[Page]):
         )
 
 
-class SelectOptionsPaginator(BaseClassPaginator[Any]):
+class SelectOptionsPaginator(BaseClassPaginator[PageT]):
     """A paginator that uses discord.ui.Select to select pages.
 
     This paginator provides one select and two buttons to navigate through "pages" with options.
@@ -99,8 +101,8 @@ class SelectOptionsPaginator(BaseClassPaginator[Any]):
 
     Parameters
     ----------
-    pages: Sequence[Union[:class:`~discord.ext.paginators._types.Page`, :class:`~discord.ext.paginators.select_paginator.PaginatorOption`]]
-        A sequence of pages to paginate through. A page can be anything that is supported by the :class:`~discord.ext.paginators.base_paginator.BaseClassPaginator` class.
+    pages: Sequence[Union[Any, :class:`.PaginatorOption`]]
+        A sequence of pages to paginate through. A page can be anything that is supported by the :class:`.BaseClassPaginator` class.
         With the addition of :class:`PaginatorOption` which is a subclass of :class:`discord.SelectOption` that also contains a ``content`` attribute,
         it can be used to provide a custom label, description and emoji for each "page".
 
@@ -120,9 +122,9 @@ class SelectOptionsPaginator(BaseClassPaginator[Any]):
                 "Page 4", "Page 5", "Page 6", "Page 7",
                 ...
             ]
-    per_select: `Optional[:class:`int`]`
+    per_select: Optional[:class:`int`]
         The amount of options per select. Defaults to :attr:`SelectOptionsPaginator.MAX_SELECT_OPTIONS`.
-    default_option: `Optional[:class:`discord.SelectOption`]`
+    default_option: Optional[:class:`discord.SelectOption`]
         The option to get the metadata from if the a page is not an instance of :class:`PaginatorOption`.
         If this is ``None``, it will try to get the metadata from the page itself.
         E,g if the page is an embed, it will try to get the title or description, etc and use that as the label.
@@ -136,10 +138,10 @@ class SelectOptionsPaginator(BaseClassPaginator[Any]):
         self,
         pages: Sequence[
             Union[
-                Page,
-                PaginatorOption[Page],
-                Sequence[Page],
-                Sequence[PaginatorOption[Page]],
+                PageT,
+                PaginatorOption[PageT],
+                Sequence[PageT],
+                Sequence[PaginatorOption[PageT]],
             ]
         ],
         *,
@@ -185,19 +187,19 @@ class SelectOptionsPaginator(BaseClassPaginator[Any]):
             label = str(label.split("\n")[0][:99])
         return discord.SelectOption(label=label or "Untitled")
 
-    def _construct_options(self, pages: Sequence[Sequence[Page]]) -> list[list[PaginatorOption[Page]]]:
-        def actual_construct(page: Union[Page, PaginatorOption[Page]]) -> PaginatorOption[Page]:
+    def _construct_options(self, pages: Sequence[Sequence[PageT]]) -> list[list[PaginatorOption[PageT]]]:
+        def actual_construct(page: Union[PageT, PaginatorOption[PageT]]) -> PaginatorOption[PageT]:
             if isinstance(page, PaginatorOption):
-                return page
+                return page  # type: ignore # it's a PaginatorOption
 
-            return PaginatorOption.from_page(
+            return PaginatorOption._from_page(
                 page,
                 self._ensure_unique_value(self.default_option) or self._get_default_option_per_page(page),
             )
 
-        res: list[list[PaginatorOption[Page]]] = []
-        options: list[PaginatorOption[Page]] = []
-        nested_options: list[PaginatorOption[Page]] = []
+        res: list[list[PaginatorOption[PageT]]] = []
+        options: list[PaginatorOption[PageT]] = []
+        nested_options: list[PaginatorOption[PageT]] = []
 
         for page in pages:
             # Sequence
@@ -231,15 +233,17 @@ class SelectOptionsPaginator(BaseClassPaginator[Any]):
 
         return res
 
-    def get_page(self, page_number: int):
-        page = super().get_page(page_number)
-        page[self.current_option_index].default = True
-        return page[self.current_option_index].content
+    def get_page(self, page_number: int) -> Union[PageT, Sequence[PageT]]:
+        page: Sequence[PaginatorOption[PageT]] = super().get_page(page_number)   # type: ignore # it's a list of PaginatorOption
+
+        option: PaginatorOption[PageT] = page[self.current_option_index]
+        option.default = True
+        return option.content
 
     async def switch_page(self, interaction: Optional[Interaction], page_number: int) -> None:
         self.current_option_index = 0
-        self.select_page.options = self.pages[page_number]
-        for option in self.select_page.options:
+        self.select_page.options = self.pages[page_number]  # type: ignore
+        for option in self.select_page.options:  # type: ignore
             option.default = False
 
         self.select_page.placeholder = f"Select a page | {self.page_string}"
@@ -258,7 +262,7 @@ class SelectOptionsPaginator(BaseClassPaginator[Any]):
                 option.default = False
 
         page = self.get_page(self.current_page)
-        self.select_page.options = self.pages[self.current_page]
+        self.select_page.options = self.pages[self.current_page]  # type: ignore
         kwrgs = await self.get_page_kwargs(page)
         await self._edit_message(interaction, **kwrgs)
 
@@ -285,8 +289,8 @@ class SelectOptionsPaginator(BaseClassPaginator[Any]):
         await self.switch_options(interaction)
 
     async def _send(self, *args: Any, **kwargs: Any) -> Optional[discord.Message]:
-        self.select_page.options = self.pages[0]
-        self.select_page.options[0].default = True
+        self.select_page.options = self.pages[0]  # type: ignore # nothing really possible to do here
+        self.select_page.options[0].default = True  # type: ignore # nothing really possible to do here
         self.select_page.placeholder = f"Select a page | {self.page_string}"
         self.previous_page.disabled = True
         self.next_page.disabled = self.max_pages == 1

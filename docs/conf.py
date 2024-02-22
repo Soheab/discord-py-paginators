@@ -44,6 +44,18 @@ html_theme = 'furo'
 html_static_path = ['_static']
 
 
+# autodoc
+# https://www.sphinx-doc.org/en/master/usage/extensions/autodoc.html#
+autodoc_typehints_format = "short"
+autodoc_typehints = "both"
+autodoc_typehints_description_target = "all"
+autodoc_type_aliases = {
+    "discord.ext.paginators._types.PageT": "Any",
+    "PageT": "Any",
+}
+autodoc_mock_imports = ["typing"]
+
+
 # sphinx.ext.napoleon
 napoleon_google_docstring = False
 napoleon_use_rtype = False
@@ -60,7 +72,7 @@ all_typevars = True
 # intersphinx 
 # https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html
 intersphinx_mapping = {
-    "py": ("https://docs.python.org/3", None),
+    "python": ("https://docs.python.org/3", None),
     "aio": ("https://docs.aiohttp.org/en/stable/", None),
     "discord": ("https://discordpy.readthedocs.io/en/latest/", None),
     "discord.ext.modal_paginator": ("https://discord-ext-modal-paginator.readthedocs.io/", None),
@@ -69,11 +81,14 @@ intersphinx_mapping = {
 # ??
 nitpicky = True
 nitpick_ignore = [
-    ("py:class", "typing_extensions.Self"),
-    ("py:class", "typing.Self"),
-    ("py:class", "typing.Unpack"),
-    ("py:class", "typing_extensions.Unpack"),
+    ("py:class", "discord.ext.paginators._types.PageT"),
+    ("py:obj", "discord.ext.paginators._types.PageT"),
+    ("py:class", "discord.ext.paginator.base_paginator.BaseClassPaginator"),
+    ("py:class", "PageSwitcherAndStopButtonView"),
     ("py:class", "ButtonPaginator[Any]"),
+    ("py:class", "typing.Unpack"),
+    ("py:class", "discord.ext.paginators.button_paginator.PageSwitcherAndStopButtonView"),
+
     # ????? idk about these, these are from discord.py
     # fixes:
     # <unknown>:1: WARNING: py:data reference target not found: typing.Union`[:py:class:`~discord.emoji.Emoji

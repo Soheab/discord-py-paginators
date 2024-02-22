@@ -2,13 +2,13 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Coroutine,
     Optional,
-    Sequence,
     TypedDict,
     Union,
+    TypeVar,
 )
+
+from collections.abc import Callable, Coroutine
 
 import discord
 
@@ -19,55 +19,30 @@ if TYPE_CHECKING:
 
     BaseClassPaginator = BaseClassPaginator[Any]
 else:
-    Self = NotRequired = BaseClassPaginator = Any
+    BaseClassPaginator = Any
 
-if TYPE_CHECKING:
-    from typing_extensions import TypeVar
 
-    ClientT = TypeVar("ClientT", bound=discord.Client, covariant=True, default=discord.Client)
-else:
-    from typing import TypeVar 
-    ClientT = TypeVar("ClientT", bound=discord.Client, covariant=True)  # type: ignore
-
-from typing import TypeVar  # F811 Redefinition of unused `TypeVar`
-
-Interaction = discord.Interaction[ClientT]
-PaginatorT = TypeVar("PaginatorT", bound="BaseClassPaginator")
+Interaction = discord.Interaction[Any]
+PaginatorT = TypeVar("PaginatorT", bound=BaseClassPaginator)
 PaginatorCheck = Callable[[PaginatorT, Interaction], Union[bool, Coroutine[Any, Any, bool]]]
 Destination = Union[discord.abc.Messageable, Interaction]
-
-_PossiblePages = Union[
-    str,
-    discord.Embed,
-    discord.File,
-    discord.Attachment,
-    dict[str, Any],
-]
-# fmt: off
-PossiblePage = Union[
-    _PossiblePages,
-    Sequence[_PossiblePages],
-    Any,
-]
-# fmt: on
-
-Page = TypeVar("Page", bound=PossiblePage)
+PageT = TypeVar("PageT", covariant=True)
 
 
 class BaseKwargs(TypedDict):
     content: Optional[str]
-    """Content of the page."""
+    """Optional[:class:`str`]: Content of the page."""
     embeds: list[discord.Embed]
-    """Embeds of the page."""
+    """List[:class:`discord.Embed`]: Embeds of the page."""
     view: Self
     """View of the page. (the paginator)"""
 
-    files: NotRequired[list[discord.File]]
-    """Files of the page. Not always available like when using `edit`."""
+    files: NotRequired[list[Union[discord.File, discord.Attachment]]]
+    """NotRequired[List[:class:`discord.File`]]: Files of the page. Not always available like when using `edit`."""
     attachments: NotRequired[list[discord.File]]  # used in edit over files
-    """Attachments of the page. Not always available, probably only when using `edit`."""
+    """NotRequired[List[Union[:class:`discord.File`, :class:`discord.Attachment`]]]: Attachments of the page. Not always available, probably only when using `edit`."""
     wait: NotRequired[bool]  # webhook/followup
-    """Whether to wait for the webhook message to be sent and returned. Only used ``Webhook.send``."""
+    """NotRequired[:class:`bool`]: Whether to wait for the webhook message to be sent and returned. Only used in interaction followups."""
 
 
 class BasePaginatorKwargs(TypedDict):
