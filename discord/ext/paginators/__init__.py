@@ -2,3 +2,4 @@
 
 __author__ = "Soheab_"
 __version__ = "0.0.1"
+__license__ = "MPL-2.0"
