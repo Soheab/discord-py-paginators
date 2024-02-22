@@ -13,7 +13,6 @@ Extension for discord.py that provides various paginators.
    
    paginators
    types
-   errors
    base
    whats_new
 

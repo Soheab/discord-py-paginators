@@ -54,12 +54,13 @@ reportDuplicateImport = "warning"
 reportDeprecated = "warning"
 reportMissingTypeStubs = "none"
 reportPrivateUsage = "none"
+reportUnnecessaryIsInstance = "none"
 
 [tool.coverage.report]
 exclude_lines = ["pragma: no cover", "@overload"]
 
 [tool.black]
-line-length = 120
+line-length = 125
 
 # https://beta.ruff.rs/docs/settings/
 [tool.ruff]
