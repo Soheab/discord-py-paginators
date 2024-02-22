@@ -136,7 +136,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
         self.__owner_ids: Optional[set[int]] = None
 
-        self.__reset_base_kwargs()
+        self._reset_base_kwargs()
 
     async def __is_bot_owner(self, interaction: Interaction) -> bool:
         """Checks if the interaction's user is one of the bot owners."""
@@ -145,7 +145,11 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
         return interaction.user.id in self.__owner_ids
 
-    def __reset_base_kwargs(self) -> None:
+    def _reset_base_kwargs(self) -> None:
+        """Resets the base kwargs.
+        
+        This sets the base kwargs to ``{"content": None, "embeds": [], "view": self}``.
+        """
         self.__base_kwargs: BaseKwargs = {"content": None, "embeds": [], "view": self}
 
     @property
@@ -165,7 +169,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
     def stop(self) -> None:
         """Stops the view and resets the base kwargs."""
-        self.__reset_base_kwargs()
+        self._reset_base_kwargs()
         self.message = None
         return super().stop()
 
@@ -352,7 +356,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
             The kwargs to send the page with.
         """
         if not skip_formatting:
-            self.__reset_base_kwargs()
+            self._reset_base_kwargs()
             _page = await self._do_format_page(page)
             return await self.get_page_kwargs(_page, skip_formatting=True)
 
