@@ -12,7 +12,7 @@ from ._types import PageT
 if TYPE_CHECKING:
     from typing_extensions import Unpack
 
-    from ._types import Interaction, BasePaginatorKwargs
+    from ._types import BasePaginatorKwargs
 
     ValidButtonKeys = Literal["FIRST", "LEFT", "RIGHT", "LAST", "STOP", "PAGE_INDICATOR"]
     ValidButtonsDict = dict[ValidButtonKeys, "PaginatorButton"]
@@ -50,7 +50,7 @@ class ChooseNumber(Modal):
 
         self.value: Optional[int] = None
 
-    async def on_submit(self, interaction: Interaction) -> None:
+    async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
         # can't happen but type checker
         if not self.number_input.value:
             await interaction.response.send_message("Please enter a number!", ephemeral=True)
@@ -117,7 +117,7 @@ class PageSwitcherAndStopButtonView(discord.ui.View):
             setattr(self, name, button)
             self.add_item(button)
 
-    async def callback(self, interaction: Interaction, button: PaginatorButton) -> None:
+    async def callback(self, interaction: discord.Interaction[Any], button: PaginatorButton) -> None:
         if button.custom_id == "stop_button":
             await interaction.response.defer()
             await interaction.delete_original_response()
@@ -166,7 +166,7 @@ class PaginatorButton(Button[Union["ButtonPaginator[Any]", PageSwitcherAndStopBu
         super().__init__(emoji=emoji, label=label, custom_id=custom_id, style=style, row=row, disabled=disabled)
         self.position: Optional[int] = position
 
-    async def callback(self, interaction: Interaction) -> None:
+    async def callback(self, interaction: discord.Interaction[Any]) -> None:
         # type checker
         if not self.view:
             raise ValueError("Something went wrong... button.view is None")
@@ -326,7 +326,7 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
         setattr(self, name, button)
         self.add_item(button)
 
-    async def _handle_modal(self, interaction: Interaction) -> Optional[int]:
+    async def _handle_modal(self, interaction: discord.Interaction[Any]) -> Optional[int]:
         modal = ChooseNumber(self)
         await interaction.response.send_modal(modal)
         await modal.wait()

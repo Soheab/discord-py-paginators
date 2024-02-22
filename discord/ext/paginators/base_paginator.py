@@ -12,7 +12,7 @@ from . import utils as _utils
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-    from ._types import PaginatorCheck, BaseKwargs, Interaction, Destination
+    from ._types import PaginatorCheck, BaseKwargs, Destination
 else:
     PaginatorCheck = Callable[[Any, discord.Interaction[Any]], Union[bool, Coroutine[Any, Any, bool]]]
 
@@ -138,7 +138,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
         self._reset_base_kwargs()
 
-    async def __is_bot_owner(self, interaction: Interaction) -> bool:
+    async def __is_bot_owner(self, interaction: discord.Interaction[Any]) -> bool:
         """Checks if the interaction's user is one of the bot owners."""
         if self.__owner_ids is None:
             self.__owner_ids = await _utils._fetch_bot_owner_ids(interaction.client)
@@ -183,7 +183,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         await self.stop_paginator()
         await super().on_timeout()
 
-    async def _handle_checks(self, interaction: Interaction) -> bool:
+    async def _handle_checks(self, interaction: discord.Interaction[Any]) -> bool:
         """Handles the checks for the paginator.
 
         This is called in :meth:`~discord.ui.View.interaction_check`.
@@ -210,7 +210,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
         return await super().interaction_check(interaction)
 
-    async def interaction_check(self, interaction: Interaction) -> bool:
+    async def interaction_check(self, interaction: discord.Interaction[Any]) -> bool:
         """This method is called by the library when the paginator receives an interaction.
 
         This method does the following checks (in order):
@@ -401,7 +401,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
             if hasattr(child, "disabled"):
                 child.disabled = True  # type: ignore # not all children have disabled attr.
 
-    async def _edit_message(self, interaction: Optional[Interaction] = None, /, **kwargs: Any) -> None:
+    async def _edit_message(self, interaction: Optional[discord.Interaction[Any]] = None, /, **kwargs: Any) -> None:
         """Edits the message with the given kwargs.
 
         Parameters
@@ -441,7 +441,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         if self.is_finished():
             await self.stop_paginator()
 
-    async def switch_page(self, interaction: Optional[Interaction], page_number: int) -> None:
+    async def switch_page(self, interaction: Optional[discord.Interaction[Any]], page_number: int) -> None:
         """Switches the page to the given page number.
 
         Parameters

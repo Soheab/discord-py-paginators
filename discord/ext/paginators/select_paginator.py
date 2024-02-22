@@ -21,7 +21,7 @@ from ._types import PageT
 if TYPE_CHECKING:
     from typing_extensions import Self, Unpack
 
-    from ._types import BasePaginatorKwargs, Interaction
+    from ._types import BasePaginatorKwargs
 
 
 __all__ = (
@@ -240,7 +240,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         option.default = True
         return option.content
 
-    async def switch_page(self, interaction: Optional[Interaction], page_number: int) -> None:
+    async def switch_page(self, interaction: Optional[discord.Interaction[Any]], page_number: int) -> None:
         self.current_option_index = 0
         self.select_page.options = self.pages[page_number]  # type: ignore
         for option in self.select_page.options:  # type: ignore
@@ -252,7 +252,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         self.next_page.disabled = self.current_page >= self.max_pages - 1
         return await super().switch_page(interaction, page_number)
 
-    async def switch_options(self, interaction: Interaction) -> None:
+    async def switch_options(self, interaction: discord.Interaction[Any]) -> None:
         selected: str = self.select_page.values[0]
         for idx, option in enumerate(self.select_page.options):
             if option.label == selected or option.value == selected:
@@ -267,7 +267,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         await self._edit_message(interaction, **kwrgs)
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple, row=1)
-    async def previous_page(self, interaction: Interaction, _: discord.ui.Button[Self]) -> None:
+    async def previous_page(self, interaction: discord.Interaction[Any], _: discord.ui.Button[Self]) -> None:
         if self.current_page <= 0:
             self.current_page = 0
         else:
@@ -276,7 +276,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         await self.switch_page(interaction, self.current_page)
 
     @discord.ui.button(label="Next", style=discord.ButtonStyle.blurple, row=1)
-    async def next_page(self, interaction: Interaction, _: discord.ui.Button[Self]) -> None:
+    async def next_page(self, interaction: discord.Interaction[Any], _: discord.ui.Button[Self]) -> None:
         if self.current_page >= self.max_pages - 1:
             self.current_page = self.max_pages - 1
         else:
@@ -285,7 +285,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         await self.switch_page(interaction, self.current_page)
 
     @discord.ui.select(placeholder="Select a page", row=0)
-    async def select_page(self, interaction: Interaction, _: discord.ui.Select[Any]) -> None:
+    async def select_page(self, interaction: discord.Interaction[Any], _: discord.ui.Select[Any]) -> None:
         await self.switch_options(interaction)
 
     async def _send(self, *args: Any, **kwargs: Any) -> Optional[discord.Message]:

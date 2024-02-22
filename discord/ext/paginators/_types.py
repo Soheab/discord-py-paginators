@@ -22,10 +22,9 @@ else:
     BaseClassPaginator = Any
 
 
-Interaction = discord.Interaction[Any]
 PaginatorT = TypeVar("PaginatorT", bound=BaseClassPaginator)
-PaginatorCheck = Callable[[PaginatorT, Interaction], Union[bool, Coroutine[Any, Any, bool]]]
-Destination = Union[discord.abc.Messageable, Interaction]
+PaginatorCheck = Callable[[PaginatorT, discord.Interaction[Any]], Union[bool, Coroutine[Any, Any, bool]]]
+Destination = Union[discord.abc.Messageable, discord.Interaction[Any]]
 PageT = TypeVar("PageT", covariant=True)
 
 
