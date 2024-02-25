@@ -297,7 +297,7 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
             )
             if (
                 not isinstance(buttons, dict)
-                or not any(k not in DEFAULT_BUTTONS for k in buttons)
+                or any(k not in DEFAULT_BUTTONS for k in buttons)
                 or not all(not v or isinstance(v, PaginatorButton) for v in buttons.values())
             ):
                 raise TypeError(error_message)
