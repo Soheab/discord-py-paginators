@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 from collections.abc import Sequence
 
+from copy import deepcopy
+
 from discord import ButtonStyle, Emoji, PartialEmoji
 import discord
 from discord.ui import Button, Modal, TextInput
@@ -350,7 +352,7 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
             button.custom_id = custom_id
 
             setattr(self, name, button)
-            self.__buttons_mapping[custom_id] = button
+            self.__buttons_mapping[custom_id] = deepcopy(button)
 
             if button.custom_id == "page_indicator_button":
                 button.label = self.page_string
