@@ -352,7 +352,6 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
             button.custom_id = custom_id
 
             setattr(self, name, button)
-            self.__buttons_mapping[custom_id] = deepcopy(button)
 
             if button.custom_id == "page_indicator_button":
                 button.label = self.page_string
@@ -371,6 +370,7 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
             if self._stop_button_and_page_switcher_view and button.custom_id == "stop_button":
                 continue
 
+            self.__buttons_mapping[custom_id] = deepcopy(button)
             self.add_item(button)
 
         if self._stop_button_and_page_switcher_view:
