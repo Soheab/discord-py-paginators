@@ -165,6 +165,15 @@ class PaginatorButton(Button[Union["ButtonPaginator[Any]", PageSwitcherAndStopBu
         disabled: bool = False,
         position: Optional[int] = None,
     ) -> None:
+        self.__original_kwargs: dict[str, Any] = {
+            "emoji": emoji,
+            "label": label,
+            "custom_id": custom_id,
+            "style": style,
+            "row": row,
+            "disabled": disabled,
+            "position": position,
+        }
         super().__init__(emoji=emoji, label=label, custom_id=custom_id, style=style, row=row, disabled=disabled)
         self.position: Optional[int] = position
 
@@ -201,6 +210,17 @@ class PaginatorButton(Button[Union["ButtonPaginator[Any]", PageSwitcherAndStopBu
                 return
 
         await self.view.switch_page(interaction, self.view.current_page)
+
+    def _copy(self) -> PaginatorButton:
+        """Create a copy of the button.
+        
+        Returns
+        -------
+        :class:`.PaginatorButton`
+            A copy of the button.
+        """
+        return PaginatorButton(**self.__original_kwargs)
+        
 
 
 class ButtonPaginator(BaseClassPaginator[PageT]):
@@ -311,10 +331,6 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
         )
 
         self.always_show_stop_button: bool = always_show_stop_button
-        # custom_id: PaginatorButton
-        # filled in __add_buttons
-        self.__buttons_mapping: dict[str, PaginatorButton] = {}
-
         self.__add_buttons()
 
     def __handle_always_show_stop_button(self) -> None:
@@ -345,7 +361,7 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
             self.stop()
             return
 
-        _buttons: dict[str, PaginatorButton] = {name: button for name, button in self._buttons.copy().items() if button}
+        _buttons: dict[str, PaginatorButton] = {name: button._copy() for name, button in self._buttons.copy().items() if button}
         sorted_buttons = sorted(_buttons.items(), key=lambda b: b[1].position if b[1].position is not None else 0)
         for name, button in sorted_buttons:
             custom_id = f"{name.lower()}_button"
@@ -361,16 +377,16 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
             if button.custom_id in ("first_button", "last_button"):
                 if self.max_pages <= 2:
                     continue
+
+                label = button.label if button.label else ''
+                if button.custom_id == "first_button":
+                    button.label = f"1 {label}"
                 else:
-                    if button.custom_id == "first_button":
-                        button.label = f"1 {button.label}"
-                    else:
-                        button.label = f"{button.label} {self.max_pages}"
+                    button.label = f"{label} {self.max_pages}"
 
             if self._stop_button_and_page_switcher_view and button.custom_id == "stop_button":
                 continue
 
-            self.__buttons_mapping[custom_id] = deepcopy(button)
             self.add_item(button)
 
         if self._stop_button_and_page_switcher_view:
@@ -388,6 +404,8 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
             if not button.custom_id:
                 raise ValueError("Something went wrong... button.custom_id is None")
 
+            original_button = self._buttons.get(f"{button.custom_id.split('_')[0].upper()}")  # type: ignore
+
             if button.custom_id in ("page_indicator_button", "stop_button"):
                 if button.custom_id == "page_indicator_button":
                     button.label = self.page_string
@@ -398,19 +416,21 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
             elif button.custom_id in ("left_button", "first_button"):
                 button.disabled = self._current_page <= 0
 
+            if button.custom_id in ("first_button", "last_button"):
+                if self.max_pages <= 2:
+                    button.disabled = True
+
+                if original_button:
+                    label = original_button.label if original_button.label else ''
+                    if button.custom_id == "first_button":
+                        button.label = f"1 {label}"
+                    else:
+                        button.label = f"{label} {self.max_pages}"
+
             if not button.disabled:
                 button.style = ButtonStyle.green
             else:
-                original_button = self.__buttons_mapping[button.custom_id]
-                button.style = original_button.style if original_button else ButtonStyle.blurple
-
-            if button.custom_id in ("first_button", "last_button"):
-                original_button = self.__buttons_mapping[button.custom_id]
-                if original_button and original_button.label:
-                    if button.custom_id == "first_button":
-                        button.label = f"1 {original_button.label}"
-                    else:
-                        button.label = f"{original_button.label} {self.max_pages}"
+                button.style = original_button.style if original_button else ButtonStyle.secondary
 
     @property
     def current_page(self) -> int:
@@ -420,3 +440,8 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
     def current_page(self, value: int) -> None:
         self._current_page = value
         self._update_buttons_state()
+
+
+    def _send(self, *args: Any, **kwargs: Any) -> Any:
+        self._update_buttons_state()
+        return super()._send(*args, **kwargs)
