@@ -95,7 +95,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
     - :class:`discord.Attachment`
     - :class:`str`
     - :class:`list` or :class:`tuple` of the above
-    - :class:`PaginatorOption` (a sbuclass of :class:`discord.SelectOption` with a ``content`` kwarg that can be any of the above)
+    - :class:`PaginatorOption` (a subclass of :class:`discord.SelectOption` with a ``content`` kwarg that can be any of the above)
 
     Other parameters are the same as :class:`discord.ext.paginators.base_paginator.BaseClassPaginator`. Except ``per_page`` which is always ``1`` and cannot be changed.
 
@@ -180,8 +180,8 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
             label = page.title or page.description or page.author.name or page.footer.text
         elif isinstance(page, (discord.File, discord.Attachment)):
             label = page.filename
-        elif isinstance(page, str):
-            label = page
+        elif isinstance(page, (int, str)):
+            label = str(page)
 
         if label:
             label = str(label.split("\n")[0][:99])
@@ -194,7 +194,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
 
             return PaginatorOption._from_page(
                 page,
-                self._ensure_unique_value(self.default_option) or self._get_default_option_per_page(page),
+                self._ensure_unique_value(self.default_option or self._get_default_option_per_page(page)),
             )
 
         res: list[list[PaginatorOption[PageT]]] = []
