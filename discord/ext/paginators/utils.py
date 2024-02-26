@@ -48,6 +48,9 @@ async def _call_and_ignore(  # type: ignore # unused
     *args: Any,
     **kwargs: Any,
 ) -> Tuple[bool, Optional[Exception]]:
+    if not functions:
+        return True, None
+
     for function in functions[:-1]:
         try:
             await function(*args, **kwargs)
@@ -57,6 +60,9 @@ async def _call_and_ignore(  # type: ignore # unused
             return True, None
 
     try:
-        return await functions[-1]()
+        await functions[-1]()
     except Exception as e:
         return False, e
+    
+    return True, None
+    
