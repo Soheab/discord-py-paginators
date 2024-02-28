@@ -259,7 +259,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         """
         success: bool = False
         if self.delete_after:
-            error_message: str = "Failed to delete the message. in {cls.__name__}.stop_paginator.\nError: {0}"
+            error_message: str = "Failed to delete the message. in {cls.__name__}.stop_paginator.\nError: {message}"
             to_call = (
                 [
                     self.message.delete,
@@ -280,7 +280,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
                 to_call,
             )
             if not success:
-                logging.debug(error_message.format(self.__class__, error))
+                logging.debug(error_message.format(cls=self.__class__, message=error))
 
             self.stop()
             return
@@ -298,7 +298,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
                 if self.message
                 else []
             )
-            error_message = "Failed to edit the message. in {cls.__name__}.stop_paginator.\nError: {0}"
+            error_message = "Failed to edit the message. in {cls.__name__}.stop_paginator.\nError: {message}"
             if interaction:
                 to_call = [
                     interaction.edit_original_response,
@@ -310,7 +310,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
             success, error = await _utils._call_and_ignore(to_call, view=self)
             if not success:
-                logging.debug(error_message.format(self.__class__, error))
+                logging.debug(error_message.format(cls=self.__class__, message=error))
 
             self.stop()
 
