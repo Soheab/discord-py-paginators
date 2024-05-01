@@ -412,7 +412,6 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
             data: dict[Any, Any] = page.copy()
             self.__base_kwargs.update(data)
 
-        self._handle_page_string()
         return self.__base_kwargs
 
     def _disable_all_children(self) -> None:
@@ -473,6 +472,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         self.current_page = page_number
         page = self.get_page(self.current_page)
         page_kwargs = await self.get_page_kwargs(page)
+        self._handle_page_string()
         await self._edit_message(interaction, **page_kwargs)
 
     @overload
@@ -560,6 +560,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
     ) -> Optional[discord.Message]:
         page = self.get_page(self.current_page)
         page_kwargs: dict[str, Any] = await self.get_page_kwargs(page)  # type: ignore # TypedDict don't go well with overloads
+        self._handle_page_string()
         if override_page_kwargs:
             page_kwargs |= send_kwargs
 

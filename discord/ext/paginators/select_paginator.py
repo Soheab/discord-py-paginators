@@ -264,6 +264,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         page = self.get_page(self.current_page)
         self.select_page.options = self.pages[self.current_page]  # type: ignore
         kwrgs = await self.get_page_kwargs(page)
+        self._handle_page_string()
         await self._edit_message(interaction, **kwrgs)
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple, row=1)
