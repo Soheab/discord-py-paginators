@@ -4,7 +4,18 @@ Changelogs
 ===========
 This page keeps a human-readable changelog of significant changes to the project.
 
-0.0.2 (2024-02-20)
+0.2.1 (2024-07-24)
+-------------------
+
+Rather small release with only bug fixes.
+
+- Fixed a bug where using the `buttons=` kwarg in :class:`button_paginator.ButtonPaginator` would raise falsely raise an error.
+- Fixed a where the labels for the `First` and `Last` buttons were not being set correctly in :class:`button_paginator.ButtonPaginator`.
+  - The way the labels are set has been changed to be more reliable and less error-prone.
+- Fixed a bug where the label for the :class:`select_paginator.PaginatorOption` was not being set correctly and would raise an internal error.
+- Fixed an internal bug where editing a message would raise an error.
+
+0.2.0 (2024-02-20)
 -------------------
 
 Many Quality of Life improvements and bug fixes.
@@ -80,7 +91,7 @@ Overall, a lot of typing improvements like ``Page`` has been replaced with ``Any
 And other unnecessary type hints have been removed.
 
 
-0.0.1 (2023-12-26)
+0.1.0 (2023-12-26)
 -------------------
 
 - Initial release!
