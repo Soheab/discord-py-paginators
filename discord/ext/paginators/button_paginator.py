@@ -2,8 +2,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union
 from collections.abc import Sequence
 
-from copy import deepcopy
-
 from discord import ButtonStyle, Emoji, PartialEmoji
 import discord
 from discord.ui import Button, Modal, TextInput
@@ -220,7 +218,6 @@ class PaginatorButton(Button[Union["ButtonPaginator[Any]", PageSwitcherAndStopBu
             A copy of the button.
         """
         return PaginatorButton(**self.__original_kwargs)
-        
 
 
 class ButtonPaginator(BaseClassPaginator[PageT]):
@@ -278,6 +275,11 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
 
         .. note::
             If ``combine_switcher_and_stop_button`` is ``True``, the ``STOP`` and ``PAGE_INDICATOR`` keys in ``buttons`` cannot be ``None``.
+    style_if_clickable: :class:`discord.ButtonStyle`
+        The style to change the buttons that are not disabled / clickable to and changes them back to the original style otherwise.
+        Defaults to :attr:`discord.ButtonStyle.green`. Pass ``None`` to disable this feature.
+
+        .. versionadded:: 0.3.0
     **kwargs: Unpack[:class:`.BasePaginatorKwargs`]
         See other parameters on :class:`discord.ext.paginator.base_paginator.BaseClassPaginator`.
     """
@@ -296,6 +298,7 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
         buttons: ValidButtonsDict = {},
         always_show_stop_button: bool = False,
         combine_switcher_and_stop_button: bool = False,
+        style_if_clickable: ButtonStyle | None = discord.utils.MISSING,
         **kwargs: Unpack[BasePaginatorKwargs],
     ) -> None:
         """Initialize the Paginator."""
@@ -331,6 +334,16 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
         )
 
         self.always_show_stop_button: bool = always_show_stop_button
+
+        if style_if_clickable is discord.utils.MISSING:
+            self._style_if_clickable = ButtonStyle.green
+        elif style_if_clickable is not None:
+            if not isinstance(style_if_clickable, ButtonStyle):
+                raise TypeError("style_if_clickable must be a discord.ButtonStyle or None.")
+            self._style_if_clickable = style_if_clickable
+        else:
+            self._style_if_clickable = None
+
         self.__add_buttons()
 
     def __handle_always_show_stop_button(self) -> None:
@@ -427,10 +440,11 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
                     else:
                         button.label = f"{label} {self.max_pages}"
 
-            if not button.disabled:
-                button.style = ButtonStyle.green
-            else:
-                button.style = original_button.style if original_button else ButtonStyle.secondary
+            if self._style_if_clickable is not None:
+                if not button.disabled:
+                    button.style = self._style_if_clickable
+                else:
+                    button.style = original_button.style if original_button else ButtonStyle.secondary
 
     @property
     def current_page(self) -> int:
@@ -440,7 +454,6 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
     def current_page(self, value: int) -> None:
         self._current_page = value
         self._update_buttons_state()
-
 
     def _send(self, *args: Any, **kwargs: Any) -> Any:
         self._update_buttons_state()
