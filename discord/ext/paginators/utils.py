@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, Tuple
 from collections.abc import Callable
 
 import inspect
+import io
 
 import discord
 
@@ -63,6 +64,25 @@ async def _call_and_ignore(  # type: ignore # unused
         await functions[-1]()
     except Exception as e:
         return False, e
-    
+
     return True, None
-    
+
+
+async def _new_file(_file: Union[discord.File, discord.Attachment], /) -> discord.File:  # type: ignore # unused
+    """Constructs a new :class:`discord.File` with the same metadata but a new file pointer
+    that can be used multiple times as discord.py closes it after it's sent once.
+
+    Parameters
+    ----------
+    _file: Union[:class:`discord.File`, :class:`discord.Attachment`]
+        The file to create a new file from.
+
+    Returns
+    -------
+    :class:`discord.File`
+        The new file.
+    """
+    file = await _file.to_file() if isinstance(_file, discord.Attachment) else _file
+    file.reset()
+    new_fp = io.BytesIO(file.fp.read())
+    return discord.File(new_fp, filename=file.filename, spoiler=file.spoiler, description=file.description)

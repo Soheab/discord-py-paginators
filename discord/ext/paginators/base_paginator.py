@@ -394,18 +394,12 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         elif isinstance(page, discord.Embed):
             self.__base_kwargs["embeds"].append(page)
         elif isinstance(page, (discord.File, discord.Attachment)):
-            # you might be wondering, why another var for this?
-            # well, because of the following type error:
-            # "File" is incompatible with "Sequence[PageT@BaseClassPaginator]"
-            if isinstance(page, discord.Attachment):
-                file = await page.to_file()
-            else:
-                file = page
-
-            if "files" not in self.__base_kwargs:
+            file = await _utils._new_file(page)
+            try:
+                self.__base_kwargs["files"].append(file)  # type: ignore # yeah no
+            except KeyError:
                 self.__base_kwargs["files"] = [file]
-            else:
-                self.__base_kwargs["files"].append(file)
+
         elif isinstance(page, dict):
             # kinda the same thing as above but it didn't appricate that it
             # didn't know the type of the key&value so it was "dict[Unknown, Unknown]"
