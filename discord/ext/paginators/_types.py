@@ -33,7 +33,7 @@ class BaseKwargs(TypedDict):
     """Optional[:class:`str`]: Content of the page."""
     embeds: list[discord.Embed]
     """List[:class:`discord.Embed`]: Embeds of the page."""
-    view: Self
+    view: discord.ui.View
     """View of the page. (the paginator)"""
 
     files: NotRequired[list[Union[discord.File, discord.Attachment]]]
