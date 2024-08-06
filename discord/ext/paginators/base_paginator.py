@@ -1,5 +1,4 @@
 from __future__ import annotations
-import logging
 from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Optional, Union, overload
 
 from collections.abc import Sequence, Coroutine
@@ -18,7 +17,6 @@ else:
 
 
 __all__ = ("BaseClassPaginator",)
-
 
 class BaseClassPaginator(discord.ui.View, Generic[PageT]):
     """Base class for all paginators.
@@ -257,30 +255,13 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         interaction: Optional[:class:`discord.Interaction`]
             Optionally, the last interaction to edit. If ``None``, ``.message`` is used.
         """
-        success: bool = False
         if self.delete_after:
-            error_message: str = "Failed to delete the message. in {cls.__name__}.stop_paginator.\nError: {message}"
-            to_call = (
-                [
-                    self.message.delete,
-                ]
-                if self.message
-                else []
-            )
             if interaction:
-                to_call = [
-                    interaction.delete_original_response,
-                ] + to_call
                 if not interaction.response.is_done():
                     await interaction.response.defer()
-                if interaction.message:
-                    to_call.insert(1, interaction.message.delete)
-
-            success, error = await _utils._call_and_ignore(
-                to_call,
-            )
-            if not success:
-                logging.debug(error_message.format(cls=self.__class__, message=error))
+                await interaction.delete_original_response()
+            elif self.message:
+                await self.message.delete()
 
             self.stop()
             return
@@ -291,28 +272,14 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
             else:
                 self._disable_all_children()
 
-            to_call: list[Callable[..., Any]] = (
-                [
-                    self.message.edit,
-                ]
-                if self.message
-                else []
-            )
-            error_message = "Failed to edit the message. in {cls.__name__}.stop_paginator.\nError: {message}"
             if interaction:
-                to_call = [
-                    interaction.edit_original_response,
-                ] + to_call
-                if not interaction.response.is_done():
-                    to_call.insert(0, interaction.response.edit_message)
-                if interaction.message:
-                    to_call.insert(1, interaction.message.edit)
-
-            success, error = await _utils._call_and_ignore(to_call, view=self)
-            if not success:
-                logging.debug(error_message.format(cls=self.__class__, message=error))
+                await interaction.response.defer()
+                await interaction.edit_original_response(view=self)
+            elif self.message:
+                await self.message.edit(view=self)
 
             self.stop()
+            return
 
     def get_page(self, page_number: int) -> Union[PageT, Sequence[PageT]]:
         """Gets the page with the given page number.
@@ -419,9 +386,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         Parameters
         ----------
         interaction: Optional[:class:`discord.Interaction`]
-            The interaction to edit.
-            If ``None``, ``.message`` is used, if that's ``None``, a :exc:`ValueError` is raised.
-            Defaults to ``None``.
+            The interaction to edit. If available.
         **kwargs: Any
             The kwargs to edit the message with.
 
@@ -431,24 +396,23 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
             If ``interaction`` is ``None`` and :attr:`.BaseClassPaginator.message` is ``None``.
         """
         kwargs.pop("ephemeral", None)
-        kwargs["attachments"] = kwargs.pop("files", [])
 
-        if interaction is None:
-            if self.message is None:
-                raise ValueError("interaction and self.message are both None.")
-            await self.message.edit(**kwargs)
+        files_to_edit: list[discord.File] = []
 
-        else:
+        atachments_or_Files = kwargs.pop("files", []) + kwargs.pop("attachments", [])
+        if atachments_or_Files:
+            for file in atachments_or_Files:
+                files_to_edit.append(await _utils._new_file(file))
+
+        kwargs["attachments"] = files_to_edit
+
+        if interaction:
             if interaction.response.is_done():
-                try:
-                    await interaction.edit_original_response(**kwargs)
-                except Exception:
-                    try:
-                        await interaction.message.edit(**kwargs)  # type: ignore
-                    except Exception:
-                        pass
+                await interaction.edit_original_response(**kwargs)
             else:
                 await interaction.response.edit_message(**kwargs)
+        elif self.message:
+            await self.message.edit(**kwargs)
 
         if self.is_finished():
             await self.stop_paginator()

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional, Union, Tuple
+from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union, Tuple
 
 from collections.abc import Callable
 
@@ -42,30 +42,6 @@ async def _fetch_bot_owner_ids(client: Union[discord.Client, Bot]) -> set[int]: 
 def _check_parameters_amount(func: Callable[..., Any], amounts: tuple[int, ...], /) -> bool:  # type: ignore # unused
     parameters = inspect.signature(func).parameters
     return len(parameters) in amounts
-
-
-async def _call_and_ignore(  # type: ignore # unused
-    functions: list[Callable[..., Any]],
-    *args: Any,
-    **kwargs: Any,
-) -> Tuple[bool, Optional[Exception]]:
-    if not functions:
-        return True, None
-
-    for function in functions[:-1]:
-        try:
-            await function(*args, **kwargs)
-        except Exception:
-            pass
-        else:
-            return True, None
-
-    try:
-        await functions[-1]()
-    except Exception as e:
-        return False, e
-
-    return True, None
 
 
 async def _new_file(_file: Union[discord.File, discord.Attachment], /) -> discord.File:  # type: ignore # unused
