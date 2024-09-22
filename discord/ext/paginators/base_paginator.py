@@ -1,7 +1,8 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Optional, Union, overload
+from typing import TYPE_CHECKING, Any, Generic, Literal, Optional, Union, overload
 
 from collections.abc import Sequence, Coroutine
+import warnings
 
 import discord
 
@@ -11,12 +12,13 @@ from . import utils as _utils
 if TYPE_CHECKING:
     from typing_extensions import Self
 
-    from ._types import PaginatorCheck, BaseKwargs, Destination
+    from _types import PaginatorCheck, BaseKwargs, Destination
 else:
-    PaginatorCheck = Callable[[Any, discord.Interaction[Any]], Union[bool, Coroutine[Any, Any, bool]]]
+    Self, PaginatorCheck, BaseKwargs, Destination = Any, Any, Any, Any
 
 
 __all__ = ("BaseClassPaginator",)
+
 
 class BaseClassPaginator(discord.ui.View, Generic[PageT]):
     """Base class for all paginators.
@@ -34,7 +36,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         - :class:`dict`: Will be updated with the kwargs of the message.
         - Sequence[Any]: Will be flattened and each entry will be handled as above.
 
-        Sequence = List, Tuple, etc.
+        Sequence = List[], Tuple(), etc.
 
         Any other types will probably be ignored.
         This attribute *should* be able to be set after the paginator is created.
@@ -79,10 +81,45 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         If the page is an embed, it will be appended to the footer text.
         If the page is a string, it will be appended to the string.
         else, it will be set as the content of the message.
+    page_string_format: Optional[:class:`str`]
+        The string format to use for the page string.
+        You can use the following placeholders:
+
+        - ``{current_page}: The current page.
+        - ``{max_pages}: The max pages.
+
+        Example
+        --------
+        .. code-block:: python
+            :linenos:
+
+            from discord.ext.paginators import ButtonPaginator
+
+            paginator = ButtonPaginator(
+                ...,
+                page_string_format="Current page: {current_page}, Max pages: {max_pages}"
+            )
+
+        Defaults to ``"Page {current_page} of {max_pages}"``.
+
+        .. versionadded:: 0.3.0
 
     timeout: Optional[Union[:class:`int`, :class:`float`]]
         The timeout for the paginator.
         Defaults to ``180.0``.
+    disable_items_after: :class:`bool`
+        Whether to disable all the children after the paginator stops / on timeout.
+
+        .. versionadded:: 0.3.0
+    clear_items_after: :class:`bool`
+        Whether to clear all the children after the paginator stops / on timeout.
+
+        .. versionadded:: 0.3.0
+    loop_pages: :class:`bool`
+        Whether to loop the pages. If ``True``, it will go back to the first page after the last page.
+        Defaults to ``False``.
+    **kwargs: Any
+        Extra kwargs to pass to the parent class.
     """
 
     def __init__(
@@ -94,20 +131,32 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         check: Optional[PaginatorCheck[Self]] = None,
         always_allow_bot_owner: bool = True,
         delete_after: bool = False,
-        disable_after: bool = False,
-        clear_buttons_after: bool = False,
         message: Optional[discord.Message] = None,
         add_page_string: bool = True,
+        page_string_format: Optional[str] = None,
+        disable_items_after: bool = False,
+        clear_items_after: bool = False,
+        loop_pages: bool = False,
         timeout: Optional[Union[int, float]] = 180.0,
+        **kwargs: Any,
     ) -> None:
-        super().__init__(timeout=timeout)
+        warning_msg: str = "{0} was renamed to {1} in v0.3.0. This warning will be removed in v0.4.0."
+        if "disable_after" in kwargs:
+            warnings.warn(warning_msg.format("disable_after", "disable_items_after"), DeprecationWarning, stacklevel=3)
+            disable_items_after = kwargs.pop("disable_after")
+
+        if "clear_buttons_after" in kwargs:
+            warnings.warn(warning_msg.format("clear_buttons_after", "clear_items_after"), DeprecationWarning, stacklevel=3)
+            clear_items_after = kwargs.pop("clear_buttons_after")
+
+        super().__init__(timeout=timeout, **kwargs)
 
         if not pages:
             raise ValueError("No pages provided.")
         if per_page < 1:
             raise ValueError("per_page must be greater than 0.")
 
-        self.pages: Sequence[PageT] = pages
+        self.pages: list[PageT] = list(pages)
         self.per_page: int = per_page
         self.max_pages: int = len(pages) // per_page + bool(len(pages) % per_page)
 
@@ -115,21 +164,22 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
         self.author_id: Optional[int] = author_id
         self._check: Optional[PaginatorCheck[Self]] = None
-        if check is not None:
-            if not callable(check) or not _utils._check_parameters_amount(check, (2, 3)):
-                raise TypeError(
-                    (
-                        "check must be a callable with exactly 2 or 3 parameters. Last two "
-                        "representing the interaction and paginator. `(async) def check(self, interaction, "
-                        "paginator):` or `(async) def check(interaction, paginator):`."
-                    )
+        if check and not (callable(check) and _utils._check_parameters_amount(check, (2, 3))):
+            raise TypeError(
+                (
+                    "check must be a callable with exactly 2 or 3 parameters. Last two "
+                    "representing the interaction and paginator. `(async) def check(self, interaction, "
+                    "paginator):` or `(async) def check(interaction, paginator):`."
                 )
+            )
 
         self.always_allow_bot_owner: bool = always_allow_bot_owner
         self.delete_after: bool = delete_after
-        self.disable_after: bool = disable_after
-        self.clear_buttons_after: bool = clear_buttons_after
         self.add_page_string: bool = add_page_string
+        self._page_string_format = page_string_format or "Page {current_page} of {max_pages}"
+        self.disable_items_after: bool = disable_items_after
+        self.clear_items_after: bool = clear_items_after
+        self.loop_pages: bool = loop_pages
 
         self.message: Optional[discord.Message] = message
 
@@ -159,12 +209,70 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
     @current_page.setter
     def current_page(self, value: int) -> None:
         """:class:`int`: Sets the current page to the given value."""
-        self._current_page = max(0, min(value, self.max_pages - 1))
+        print(
+            value,
+            self.max_pages,
+            len(self.pages),
+            self.per_page,
+            self.loop_pages,
+        )
+
+        if self.loop_pages:
+            if value < 0:
+                value = self.max_pages - 1
+            elif value >= self.max_pages:
+                value = 0
+        else:
+            value = max(0, min(value, self.max_pages - 1))
+
+        print(
+            "setting",
+            value,
+            self.max_pages,
+            len(self.pages),
+            self.per_page,
+            self.loop_pages,
+        )
+        self._current_page = value
+
+    @property
+    def page_string_format(self) -> str:
+        """:class:`str`: The page string format.
+
+        .. versionadded:: 0.3.0
+        """
+        return self._page_string_format
+
+    @page_string_format.setter
+    def page_string_format(self, value: str) -> None:
+        """:class:`str`: Sets the page string format to the given value.
+
+        You can use the following placeholders:
+
+        - ``{current_page}: The current page.
+        - ``{max_pages}: The max pages.
+
+        .. versionadded:: 0.3.0
+
+        Raises
+        ------
+        :exc:`ValueError`
+            Value is not a string.
+        """
+        if not isinstance(value, str):
+            raise ValueError(f"Value must be a string. Not {value!r}")
+
+        self._page_string_format = value
 
     @property
     def page_string(self) -> str:
-        """:class:`str`: A string representing the current page and the max pages."""
-        return f"Page {self.current_page + 1} of {self.max_pages}"
+        """:class:`str`: A string representing the current page and the max pages.
+
+        You can modify this by passing the kwarg or setting the attr called ``page_string_format``.
+        """
+        current_page = self.current_page + 1
+        max_pages = self.max_pages
+        return self._page_string_format.format(current_page=current_page, max_pages=max_pages)
 
     def stop(self) -> None:
         """Stops the view and resets the base kwargs."""
@@ -197,9 +305,8 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         :class:`bool`
             Whether the interaction is valid or not.
         """
-        if self.always_allow_bot_owner:
-            if await self.__is_bot_owner(interaction):
-                return True
+        if self.always_allow_bot_owner and await self.__is_bot_owner(interaction):
+            return True
 
         if self.author_id is not None and interaction.user.id == self.author_id:
             return True
@@ -255,6 +362,21 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         interaction: Optional[:class:`discord.Interaction`]
             Optionally, the last interaction to edit. If ``None``, ``.message`` is used.
         """
+        if self.disable_items_after or self.clear_items_after:
+            if self.disable_items_after:
+                self._disable_all_children()
+            else:
+                self.clear_items()
+
+            if interaction:
+                await interaction.response.defer()
+                await interaction.edit_original_response(view=self)
+            elif self.message:
+                await self.message.edit(view=self)
+
+            self.stop()
+            return
+
         if self.delete_after:
             if interaction:
                 if not interaction.response.is_done():
@@ -266,22 +388,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
             self.stop()
             return
 
-        if self.disable_after or self.clear_buttons_after:
-            if self.clear_buttons_after:
-                self.clear_items()
-            else:
-                self._disable_all_children()
-
-            if interaction:
-                await interaction.response.defer()
-                await interaction.edit_original_response(view=self)
-            elif self.message:
-                await self.message.edit(view=self)
-
-            self.stop()
-            return
-
-    def get_page(self, page_number: int) -> Union[PageT, Sequence[PageT]]:
+    def get_page(self, page_number: int) -> Union[PageT, list[PageT]]:
         """Gets the page with the given page number.
 
         Parameters
@@ -291,18 +398,29 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
         Returns
         -------
-        Union[Any], Sequence[Any]]
+        Union[Any], list[Any]]
             The page(s) with the given page number.
         """
-        # handle per_page
-        if page_number < 0 or page_number >= self.max_pages:
-            self.current_page = 0
-            return self.pages[self.current_page]
+        #    print(page_number, self.max_pages, len(self.pages), self.per_page, self.loop_pages, page_number )
+        #
+        #    if self.loop_pages:
+        #        if page_number < 0:
+        #            page_number = self.max_pages - 1
+        #        elif page_number >= self.max_pages:
+        #            page_number = 0
+        #
+        #    # handle per_page
+        #    if not self.loop_pages and (page_number < 0 or page_number >= self.max_pages):
+        #        self.current_page = 0
+        #        return self.pages[self.current_page]
 
+        # if not self.loop_pages and (page_number < 0 or page_number >= self.max_pages):
+        #    return self.pages[self.current_page]
+        self.current_page = page_number
         if self.per_page == 1:
-            return self.pages[page_number]
+            return self.pages[self.current_page]
         else:
-            base = page_number * self.per_page
+            base = self.current_page * self.per_page
             return self.pages[base : base + self.per_page]
 
     def _handle_page_string(self) -> None:
@@ -366,7 +484,6 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
                 self.__base_kwargs["files"].append(file)  # type: ignore # yeah no
             except KeyError:
                 self.__base_kwargs["files"] = [file]
-
         elif isinstance(page, dict):
             # kinda the same thing as above but it didn't appricate that it
             # didn't know the type of the key&value so it was "dict[Unknown, Unknown]"
@@ -399,20 +516,25 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
         files_to_edit: list[discord.File] = []
 
-        atachments_or_Files = kwargs.pop("files", []) + kwargs.pop("attachments", [])
-        if atachments_or_Files:
-            for file in atachments_or_Files:
+        atachments_or_files = kwargs.pop("files", []) + kwargs.pop("attachments", [])
+        if atachments_or_files:
+            for file in atachments_or_files:
                 files_to_edit.append(await _utils._new_file(file))
 
         kwargs["attachments"] = files_to_edit
 
-        if interaction:
+        if not interaction and self.message:
+            await self.message.edit(**kwargs)
+        elif interaction:
             if interaction.response.is_done():
-                await interaction.edit_original_response(**kwargs)
+                try:
+                    await interaction.edit_original_response(**kwargs)
+                except discord.NotFound:
+                    if self.message:
+                        await self.message.edit(**kwargs)
+                    pass
             else:
                 await interaction.response.edit_message(**kwargs)
-        elif self.message:
-            await self.message.edit(**kwargs)
 
         if self.is_finished():
             await self.stop_paginator()
@@ -441,8 +563,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         override_page_kwargs: bool = ...,
         edit_message: Literal[True] = ...,
         **send_kwargs: Any,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def send(
@@ -452,8 +573,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         override_page_kwargs: bool = ...,
         edit_message: Literal[False] = ...,
         **send_kwargs: Any,
-    ) -> discord.Message:
-        ...
+    ) -> discord.Message: ...
 
     @overload
     async def send(
@@ -462,8 +582,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         *,
         override_page_kwargs: Literal[False] = ...,
         edit_message: bool = ...,
-    ) -> Optional[discord.Message]:
-        ...
+    ) -> Optional[discord.Message]: ...
 
     @overload
     async def send(
@@ -473,8 +592,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         override_page_kwargs: Literal[True] = ...,
         edit_message: bool = ...,
         **send_kwargs: Any,
-    ) -> Optional[discord.Message]:
-        ...
+    ) -> Optional[discord.Message]: ...
 
     async def send(
         self,

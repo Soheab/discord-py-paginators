@@ -4,6 +4,17 @@ Changelogs
 ===========
 This page keeps a human-readable changelog of significant changes to the project.
 
+0.3.0 (2024-09-01)
+-------------------
+
+This release brings a lot of improvements and changes to the project.
+
+Changes per module
+~~~~~~~~~~~~~~~~~~~
+
+base_paginator
+
+
 0.2.1 (2024-07-24)
 -------------------
 

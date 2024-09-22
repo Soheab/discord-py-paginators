@@ -35,6 +35,16 @@ docs = [
 ]
 dev = ["black", "ruff", "typing_extensions", "pyright"]
 modalpaginator = ["discord-ext-modal-paginator"]
+# credits to discord.py: 
+# https://github.com/Rapptz/discord.py/blob/59f877fcf013c4ddeeb2b39fc21f03e76f995461/pyproject.toml#L60-L68
+test = [
+    "coverage[toml]",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-mock",
+    "typing-extensions",
+]
 
 [tool.setuptools]
 packages = ["discord", "discord.ext", "discord.ext.paginators"]
@@ -106,3 +116,12 @@ max-args = 20  # default: 5 # lets not limit ourselves :)
 [tool.ruff.pyupgrade]
 # Preserve types, even if a file imports `from __future__ import annotations`.
 keep-runtime-typing = true  # default: false
+
+# https://docs.pytest.org/en/stable/explanation/goodpractices.html#tests-outside-application-code
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
