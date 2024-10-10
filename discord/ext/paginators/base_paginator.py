@@ -291,7 +291,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
 
         Returns
         -------
-        Union[Any], Sequence[Any]]
+        Union[Any, Sequence[Any]]
             The page(s) with the given page number.
         """
         # handle per_page
