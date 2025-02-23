@@ -10,7 +10,6 @@ from typing import (
 )
 from collections.abc import Sequence
 
-from copy import deepcopy
 import os
 
 import discord
@@ -39,8 +38,11 @@ class PaginatorOption(discord.SelectOption, Generic[PageT]):
     ----------
     content: Union[Any, Sequence[Any]]
         The content of the page. See :class:`SelectOptionsPaginator` for more the supported types.
-    emoji: Optional[Union[:class:`str`, :class:`discord.Emoji`, :class:`discord.PartialEmoji`]]
-        The emoji to use for the option. Defaults to ``None``.
+    label_from_content: :class:`bool`
+        Whether to base the label of the option from the content.
+        E.g. if the content is an embed, it will try to get the title or author name, etc and use that as the label.
+
+        Defaults to ``True`` if ``label`` is not provided.
     """
 
     def __init__(
@@ -51,36 +53,46 @@ class PaginatorOption(discord.SelectOption, Generic[PageT]):
         emoji: Optional[Union[str, discord.Emoji, discord.PartialEmoji]] = None,
         value: str = discord.utils.MISSING,
         description: Optional[str] = None,
+        label_from_page: bool = True,
     ) -> None:
-        super().__init__(label=label, value=value, description=description, emoji=emoji)
         self.content: Union[PageT, Sequence[PageT]] = content
+        if not label and label_from_page:
+            label = self.__label_from_content()
 
-    @classmethod
-    def _from_page(
-        cls,
-        page: Any,
-        copy_from: Optional[discord.SelectOption] = None,
-        *,
-        label: str = discord.utils.MISSING,
-        value: str = discord.utils.MISSING,
-        description: Optional[str] = None,
-        emoji: Optional[Union[str, discord.Emoji, discord.PartialEmoji]] = None,
-    ) -> Self:
-        if isinstance(page, discord.SelectOption):
-            raise TypeError(
-                "A regular SelectOption is not supported as it doesn't contain any content. Use PaginatorOption instead or pass a Page."
-            )
+        super().__init__(label=label, value=self.__ensure_unique_value(label, value), description=description, emoji=emoji)
 
-        if not copy_from and label is discord.utils.MISSING and emoji is None:
-            raise TypeError("Either label or emoji must be provided if copy_from is not provided")
+    def __str__(self) -> str:
+        return self.content if isinstance(self.content, str) else str(self.content) or self.label
 
-        return cls(
-            content=page,
-            label=label or copy_from.label,  # type: ignore # it's handled in the if statement above
-            value=value or copy_from.value,  # type: ignore # it's handled in the if statement above
-            description=description or copy_from.description,  # type: ignore # it's handled in the if statement above
-            emoji=emoji or copy_from.emoji,  # type: ignore # it's handled in the if statement above
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} label={self.label!r}>"
+
+    def copy(self: Self) -> Self:
+        return self.__class__(
+            self.content, label=self.label, emoji=self.emoji, value=self.value, description=self.description
         )
+
+    def __label_from_content(self) -> str:
+        if isinstance(self.content, discord.Embed):
+            return (
+                self.content.title
+                or self.content.description
+                or self.content.author.name
+                or self.content.footer.text
+                or "Untitled"
+            )
+        elif isinstance(self.content, (discord.File, discord.Attachment)):
+            return self.content.filename
+        elif isinstance(self.content, (int, str)):
+            return str(self.content)
+
+        return "Untitled"
+
+    def __ensure_unique_value(self, label: str = discord.utils.MISSING, value: str = discord.utils.MISSING) -> str:
+        if value != label:
+            return value or label
+
+        return (str(os.urandom(16).hex()) if value == label else "")[:99]
 
 
 class SelectOptionsPaginator(BaseClassPaginator[PageT]):
@@ -122,14 +134,38 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
                 "Page 4", "Page 5", "Page 6", "Page 7",
                 ...
             ]
+
+        Note that a nested list ([1, 2, 3, [4, 5, 6]]) is not supported.
     per_select: Optional[:class:`int`]
         The amount of options per select. Defaults to :attr:`SelectOptionsPaginator.MAX_SELECT_OPTIONS`.
+    set_default_on_switch: :class:`bool`
+        Whether to set the first option of each "page" as the default option.
+
+        This is also used when sending the paginator for the first time.
+
+        Defaults to ``True``.
+
+        .. versionadded:: 0.2.2
+    set_default_on_select: :class:`bool`
+        Whether to set the selected option as the default option. Defaults to ``True``.
+
+        .. versionadded:: 0.2.2
     default_option: Optional[:class:`discord.SelectOption`]
         The option to get the metadata from if the a page is not an instance of :class:`PaginatorOption`.
         If this is ``None``, it will try to get the metadata from the page itself.
         E,g if the page is an embed, it will try to get the title or description, etc and use that as the label.
+
         Defaults to ``None``.
+
+        .. deprecated:: 0.2.2
+            This parameter is deprecated and will be removed in a future version. It is recommended to use :class:`PaginatorOption` instead.
     """
+
+    if TYPE_CHECKING:
+        from ._types import BaseKwargs
+
+        async def get_page_kwargs(self, page: PaginatorOption[PageT]) -> BaseKwargs:  # pyright: ignore[reportIncompatibleMethodOverride] # dwai
+            ...
 
     MAX_SELECT_OPTIONS: ClassVar[Literal[25]] = 25
     """The maximum amount of options per select by discord by the time of writing this."""
@@ -145,12 +181,27 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
             ]
         ],
         *,
-        per_select: Optional[int] = None,
+        per_select: int = discord.utils.MISSING,
+        set_default_on_switch: bool = True,
+        set_default_on_select: bool = True,
         default_option: Optional[discord.SelectOption] = None,
         **kwargs: Unpack[BasePaginatorKwargs],
     ) -> None:
+        if default_option is not None:
+            import warnings
+
+            warnings.warn(
+                (
+                    "The 'default_option' parameter is deprecated since v0.2.2 and will be removed in a future version. "
+                    "It is recommended to use PaginatorOption instead."
+                ),
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         self.per_select: int = per_select or self.MAX_SELECT_OPTIONS
-        self.default_option: Optional[discord.SelectOption] = default_option
+        self._default_on_switch: bool = set_default_on_switch
+        self._default_on_select: bool = set_default_on_select
 
         if "per_page" in kwargs:
             raise TypeError("per_page cannot be changed for SelectOptionsPaginator")
@@ -162,66 +213,36 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         )
         self.current_option_index: int = 0
 
-    def _ensure_unique_value(self, option: Optional[discord.SelectOption]) -> Optional[discord.SelectOption]:
-        if not option:
-            return None
-
-        if option.value != option.label:
-            return option
-
-        new_option = deepcopy(option)
-        new_option.value += str(os.urandom(16).hex()) if option.value == option.label else ""
-        new_option.value = new_option.value[:99]
-        return new_option
-
-    def _get_default_option_per_page(self, page: Any) -> discord.SelectOption:
-        label: Optional[str] = None
-        if isinstance(page, discord.Embed):
-            label = page.title or page.description or page.author.name or page.footer.text
-        elif isinstance(page, (discord.File, discord.Attachment)):
-            label = page.filename
-        elif isinstance(page, (int, str)):
-            label = str(page)
-
-        if label:
-            label = str(label.split("\n")[0][:99])
-        return discord.SelectOption(label=label or "Untitled")
-
     def _construct_options(self, pages: Sequence[Sequence[PageT]]) -> list[list[PaginatorOption[PageT]]]:
         def actual_construct(page: Union[PageT, PaginatorOption[PageT]]) -> PaginatorOption[PageT]:
             if isinstance(page, PaginatorOption):
-                return page  # type: ignore # it's a PaginatorOption
+                return page.copy()  # pyright: ignore[reportUnknownVariableType] # it's a PaginatorOption dwai
 
-            return PaginatorOption._from_page(
-                page,
-                self._ensure_unique_value(self.default_option or self._get_default_option_per_page(page)),
-            )
+            return PaginatorOption[PageT](page)
 
         res: list[list[PaginatorOption[PageT]]] = []
         options: list[PaginatorOption[PageT]] = []
-        nested_options: list[PaginatorOption[PageT]] = []
 
         for page in pages:
             # Sequence
             if isinstance(page, (list, tuple)):
-                if len(page) == 0:
-                    continue
-
-                for item in page:
-                    if isinstance(item, (list, tuple)):
-                        raise TypeError("Nested lists are not supported")
-
-                    nested_options.append(actual_construct(item))
+                nested_options = [actual_construct(item) for item in page]
 
                 if len(nested_options) > self.per_select:
                     raise ValueError(
                         f"Too many options for one select in nested list (max: {self.per_select}, got: {len(nested_options)})"
                     )
 
-                options.append(nested_options)  # type: ignore # dw, it's a list of PaginatorOption
-                nested_options = []
-            else:
-                options.append(actual_construct(page))  # type: ignore # Sequence is handled above
+                res.append(nested_options)
+                continue
+
+            # PaginatorOption
+            if isinstance(page, PaginatorOption):
+                options.append(page)
+                continue
+
+            # Single page
+            options.append(actual_construct(page))
 
         for option in options:
             if isinstance(option, list):
@@ -233,21 +254,45 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
 
         return res
 
-    def get_page(self, page_number: int) -> Union[PageT, Sequence[PageT]]:
-        page: Sequence[PaginatorOption[PageT]] = super().get_page(page_number)  # type: ignore # it's a list of PaginatorOption
+    def __reset_options(self) -> None:
+        for option in self.select_page.options:
+            option.default = False
 
+    async def format_page(self, page: PaginatorOption[PageT]) -> Union[PageT, Sequence[PageT]]:  # pyright: ignore[reportIncompatibleMethodOverride] # dwai
+        """This method can be overridden to format the page before sending it.
+        By default, it returns the page's content.
+
+        Parameters
+        ----------
+        page: :class:`PaginatorOption`
+            The option to format.
+
+            Use the ``content`` attribute to get the contents of the page.
+
+            .. versionchanged:: 0.2.2
+                This is now the selected option instead of the page's contents.
+
+        Returns
+        -------
+        Union[Any], Sequence[Any]]
+            The formatted page(s).
+        """
+        return page.content
+
+    def get_page(self, page_number: int) -> PaginatorOption[PageT]:  # pyright: ignore[reportIncompatibleMethodOverride] # dwai
+        page: Sequence[PaginatorOption[PageT]] = super().get_page(page_number)  # pyright: ignore[reportAssignmentType] # it's a list of PaginatorOption
         option: PaginatorOption[PageT] = page[self.current_option_index]
-        option.default = True
-        return option.content
+        return option
 
     async def switch_page(self, interaction: Optional[discord.Interaction[Any]], page_number: int) -> None:
         self.current_option_index = 0
         self.select_page.options = self.pages[page_number]  # type: ignore
-        for option in self.select_page.options:  # type: ignore
-            option.default = False
+        self.__reset_options()
+
+        if self._default_on_switch:
+            self.select_page.options[self.current_option_index].default = True  # type: ignore
 
         self.select_page.placeholder = f"Select a page | {self.page_string}"
-
         self.previous_page.disabled = self.current_page <= 0
         self.next_page.disabled = self.current_page >= self.max_pages - 1
         return await super().switch_page(interaction, page_number)
@@ -257,14 +302,16 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         for idx, option in enumerate(self.select_page.options):
             if option.label == selected or option.value == selected:
                 self.current_option_index = idx
-                option.default = True
-            else:
-                option.default = False
+                break
 
         page = self.get_page(self.current_page)
         self.select_page.options = self.pages[self.current_page]  # type: ignore
+        self.__reset_options()
+        if self._default_on_select:
+            self.select_page.options[self.current_option_index].default = True  # pyright: ignore[reportIndexIssue]
+
         kwrgs = await self.get_page_kwargs(page)
-        self._handle_page_string()
+        super()._handle_page_string()
         await self._edit_message(interaction, **kwrgs)
 
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.blurple, row=1)
@@ -285,14 +332,17 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
 
         await self.switch_page(interaction, self.current_page)
 
-    @discord.ui.select(placeholder="Select a page", row=0)
+    @discord.ui.select(cls=discord.ui.Select[Self], placeholder="Select a page", row=0)
     async def select_page(self, interaction: discord.Interaction[Any], _: discord.ui.Select[Any]) -> None:
         await self.switch_options(interaction)
 
     async def _send(self, *args: Any, **kwargs: Any) -> Optional[discord.Message]:
+        self.current_option_index = 0
         self.select_page.options = self.pages[0]  # type: ignore # nothing really possible to do here
-        self.select_page.options[0].default = True  # type: ignore # nothing really possible to do here
+        self.__reset_options()
         self.select_page.placeholder = f"Select a page | {self.page_string}"
         self.previous_page.disabled = True
         self.next_page.disabled = self.max_pages == 1
+        if self._default_on_switch:
+            self.select_page.options[self.current_option_index].default = True  # type: ignore
         return await super()._send(*args, **kwargs)

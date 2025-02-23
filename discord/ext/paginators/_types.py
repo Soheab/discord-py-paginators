@@ -13,7 +13,7 @@ from collections.abc import Callable, Coroutine
 import discord
 
 if TYPE_CHECKING:
-    from typing_extensions import Self, NotRequired
+    from typing_extensions import NotRequired
 
     from .base_paginator import BaseClassPaginator
 
@@ -22,7 +22,7 @@ else:
     BaseClassPaginator = Any
 
 
-PaginatorT = TypeVar("PaginatorT", bound=BaseClassPaginator)
+PaginatorT = TypeVar("PaginatorT", bound=BaseClassPaginator)  # type: ignore
 PaginatorCheck = Callable[[PaginatorT, discord.Interaction[Any]], Union[bool, Coroutine[Any, Any, bool]]]
 Destination = Union[discord.abc.Messageable, discord.Interaction[Any]]
 PageT = TypeVar("PageT", covariant=True)
