@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from typing_extensions import Self, Unpack
 
     from ._types import BasePaginatorKwargs
+else:
+    Self = Unpack = BasePaginatorKwargs = Any
 
 
 __all__ = (
