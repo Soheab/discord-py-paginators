@@ -443,6 +443,42 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         else:
             self.__base_kwargs["content"] = self.page_string
 
+    async def on_next_page(self, interaction: discord.Interaction[Any], before: int, after: int) -> None:
+        """Called when the paginator goes to the next page.
+
+        This method is called after the page is switched and does nothing by default.
+
+        .. versionadded:: 0.2.2
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered the event.
+        before: :class:`int`
+            The page number before.
+        after: :class:`int`
+            The page number after.
+        """
+        pass
+
+    async def on_previous_page(self, interaction: discord.Interaction[Any], before: int, after: int) -> None:
+        """Called when the paginator goes to the previous page.
+
+        This method is called after the page is switched and does nothing by default.
+
+        .. versionadded:: 0.2.2
+
+        Parameters
+        ----------
+        interaction: :class:`discord.Interaction`
+            The interaction that triggered the event.
+        before: :class:`int`
+            The page number before.
+        after: :class:`int`
+            The page number after.
+        """
+        pass
+
     async def get_page_kwargs(self, page: Union[PageT, Sequence[PageT]], /, skip_formatting: bool = False) -> BaseKwargs:
         """Gets the kwargs to send the page with.
 
@@ -549,11 +585,18 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         page_number: :class:`int`
             The page number to switch to.
         """
+        current_page_number = int(self.current_page)
         self.current_page = page_number
         page = self.get_page(self.current_page)
         page_kwargs = await self.get_page_kwargs(page)
         self._handle_page_string()
         await self._edit_message(interaction, **page_kwargs)
+
+        if interaction:
+            if page_number < self.current_page:
+                await self.on_previous_page(interaction=interaction, before=current_page_number, after=self.current_page)
+            elif page_number > self.current_page:
+                await self.on_next_page(interaction=interaction, before=current_page_number, after=self.current_page)
 
     @overload
     async def send(
