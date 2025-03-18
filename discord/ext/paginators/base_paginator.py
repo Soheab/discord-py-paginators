@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Optional, Union, overload
 
 from collections.abc import Sequence, Coroutine
+from math import ceil
 
 import discord
 
@@ -103,14 +104,8 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
     ) -> None:
         super().__init__(timeout=timeout)
 
-        if not pages:
-            raise ValueError("No pages provided.")
-        if per_page < 1:
-            raise ValueError("per_page must be greater than 0.")
-
-        self.pages: Sequence[PageT] = pages
-        self.per_page: int = per_page
-        self.max_pages: int = len(pages) // per_page + bool(len(pages) % per_page)
+        self.pages = pages
+        self.per_page = per_page
 
         self._current_page: int = 0
 
@@ -155,6 +150,17 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
     @property
     def current_page(self) -> int:
         """:class:`int`: The current page. Starts from ``0``."""
+        if self._current_page < 0:
+            self._current_page = 0
+        elif self._current_page >= self.max_pages:
+            self._current_page = self.max_pages - 1
+        elif self.per_page == 0:
+            self._current_page = 0
+        elif self.per_page == 1:
+            self._current_page = self._current_page % len(self.pages)
+        else:
+            self._current_page = self._current_page % self.max_pages
+
         return self._current_page
 
     @current_page.setter
@@ -166,6 +172,49 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
     def page_string(self) -> str:
         """:class:`str`: A string representing the current page and the max pages."""
         return f"Page {self.current_page + 1} of {self.max_pages}"
+
+    @property
+    def pages(self) -> Sequence[PageT]:
+        """Sequence[Any]: The pages of the paginator."""
+        return self._pages
+
+    @property
+    def per_page(self) -> int:
+        """:class:`int`: The amount of pages to display per page."""
+        return self._per_page
+
+    @per_page.setter
+    def per_page(self, value: int) -> None:
+        """Sets the amount of pages to display per page."""
+        if not isinstance(value, int):
+            raise TypeError("per_page must be an int.")
+
+        if value < 1:
+            raise ValueError("per_page must be greater than 0.")
+
+        if value > len(self.pages):
+            raise ValueError("per_page cannot be greater than the amount of pages.")
+
+        self._per_page = value
+
+    @pages.setter
+    def pages(self, value: Sequence[PageT]) -> None:
+        """Sets the pages of the paginator."""
+        if not value:
+            raise ValueError("pages cannot be empty.")
+
+        if not isinstance(value, (list, tuple)):
+            raise TypeError("pages must be a list or tuple.")
+
+        self._pages = value
+
+    @property
+    def max_pages(self) -> int:
+        """int: The max pages of the paginator."""
+        if self.per_page == 0:
+            return 0
+
+        return ceil(len(self.pages) / self.per_page)
 
     def stop(self) -> None:
         """Stops the view and resets the base kwargs."""
@@ -556,6 +605,9 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         edit_message: bool = False,
         **send_kwargs: Any,
     ) -> Optional[discord.Message]:
+        if not self.pages:
+            raise ValueError("No pages to send.")
+
         page = self.get_page(self.current_page)
         page_kwargs: dict[str, Any] = await self.get_page_kwargs(page)  # type: ignore # TypedDict don't go well with overloads
         self._handle_page_string()
