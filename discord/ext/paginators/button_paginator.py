@@ -10,7 +10,7 @@ from .base_paginator import BaseClassPaginator
 from ._types import PageT
 
 if TYPE_CHECKING:
-    from typing_extensions import Unpack
+    from typing_extensions import Unpack, Self
 
     from ._types import BasePaginatorKwargs
 
@@ -211,7 +211,7 @@ class PaginatorButton(Button[Union["ButtonPaginator[Any]", PageSwitcherAndStopBu
 
     def _copy(self) -> PaginatorButton:
         """Create a copy of the button.
-        
+
         Returns
         -------
         :class:`.PaginatorButton`
@@ -299,7 +299,7 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
         always_show_stop_button: bool = False,
         combine_switcher_and_stop_button: bool = False,
         style_if_clickable: ButtonStyle | None = discord.utils.MISSING,
-        **kwargs: Unpack[BasePaginatorKwargs],
+        **kwargs: Unpack[BasePaginatorKwargs[Self]],
     ) -> None:
         """Initialize the Paginator."""
         super().__init__(pages, **kwargs)
@@ -374,7 +374,9 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
             self.stop()
             return
 
-        _buttons: dict[str, PaginatorButton] = {name: button._copy() for name, button in self._buttons.copy().items() if button}
+        _buttons: dict[str, PaginatorButton] = {
+            name: button._copy() for name, button in self._buttons.copy().items() if button
+        }
         sorted_buttons = sorted(_buttons.items(), key=lambda b: b[1].position if b[1].position is not None else 0)
         for name, button in sorted_buttons:
             custom_id = f"{name.lower()}_button"
@@ -391,7 +393,7 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
                 if self.max_pages <= 2:
                     continue
 
-                label = button.label if button.label else ''
+                label = button.label if button.label else ""
                 if button.custom_id == "first_button":
                     button.label = f"1 {label}"
                 else:
@@ -434,7 +436,7 @@ class ButtonPaginator(BaseClassPaginator[PageT]):
                     button.disabled = True
 
                 if original_button:
-                    label = original_button.label if original_button.label else ''
+                    label = original_button.label if original_button.label else ""
                     if button.custom_id == "first_button":
                         button.label = f"1 {label}"
                     else:

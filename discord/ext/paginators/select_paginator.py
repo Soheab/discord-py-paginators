@@ -265,7 +265,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         set_default_on_select: bool = True,
         add_in_order: bool = False,
         default_option: Optional[discord.SelectOption] = None,
-        **kwargs: Unpack[BasePaginatorKwargs],
+        **kwargs: Unpack[BasePaginatorKwargs[Self]],
     ) -> None:
         if default_option is not None:
             import warnings
