@@ -247,17 +247,15 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         :class:`bool`
             Whether the interaction is valid or not.
         """
-        if self.always_allow_bot_owner:
-            if await self.__is_bot_owner(interaction):
-                return True
-
-        if self.author_id is not None and interaction.user.id == self.author_id:
+        if (self.always_allow_bot_owner and await self.__is_bot_owner(interaction)) or (
+            self.author_id is not None and interaction.user.id == self.author_id
+        ):
             return True
 
-        if self._check is not None:
+        if self._check:
             return await discord.utils.maybe_coroutine(self._check, self, interaction)
 
-        return await super().interaction_check(interaction)
+        return False
 
     async def interaction_check(self, interaction: discord.Interaction[Any]) -> bool:
         """This method is called by the library when the paginator receives an interaction.
@@ -267,7 +265,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         - If ``always_allow_bot_owner`` is ``True``, it checks if the interaction's author id is one of the bot owners.
         - If ``author_id`` is not ``None``, it checks if the interaction's author id is the same as the one set.
         - If ``check`` is not ``None``, it calls it and checks if it returns ``True``.
-        - If none of the above checks are ``True``, it calls :meth:`discord.ui.View.interaction_check`.
+        - If none of the above checks are ``True``, it returns ``False``.
 
         Parameters
         ----------
