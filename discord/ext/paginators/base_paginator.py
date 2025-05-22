@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, Optional, Union, overload
 
+import logging
 from collections.abc import Sequence, Coroutine
 from math import ceil
 
@@ -18,6 +19,8 @@ else:
 
 
 __all__ = ("BaseClassPaginator",)
+
+_log = logging.getLogger(__name__)
 
 
 class BaseClassPaginator(discord.ui.View, Generic[PageT]):
@@ -247,15 +250,19 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         :class:`bool`
             Whether the interaction is valid or not.
         """
-        if (self.always_allow_bot_owner and await self.__is_bot_owner(interaction)) or (
-            self.author_id is not None and interaction.user.id == self.author_id
-        ):
+        _log.debug("Checking interaction %s", interaction)
+        if self.always_allow_bot_owner and await self.__is_bot_owner(interaction):
+            _log.debug("Allowing bot owner %s to interact with the paginator since always_allow_bot_owner is True", interaction.user)
             return True
-
-        if self._check:
+        elif self.author_id is not None:
+            _log.debug("Checking if %s equals %s", interaction.user, self.author_id)
+            return interaction.user.id == self.author_id
+        elif self._check:
+            _log.debug("Calling check %s", self._check)
             return await discord.utils.maybe_coroutine(self._check, self, interaction)
-
-        return False
+        
+        _log.debug("No checks to run, allowing interaction")
+        return True
 
     async def interaction_check(self, interaction: discord.Interaction[Any]) -> bool:
         """This method is called by the library when the paginator receives an interaction.
