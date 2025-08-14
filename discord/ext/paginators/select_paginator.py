@@ -3,12 +3,10 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Generic,
     Literal,
     Optional,
     Union,
 )
-from collections.abc import Sequence
 
 import os
 from functools import partial
@@ -16,12 +14,11 @@ from functools import partial
 import discord
 
 from .base_paginator import BaseClassPaginator
-from ._types import PageT
 
 if TYPE_CHECKING:
     from typing_extensions import Self, Unpack
 
-    from ._types import BasePaginatorKwargs
+    from ._types import BasePaginatorKwargs, Sequence
 else:
     Self = Unpack = BasePaginatorKwargs = Any
 
@@ -32,7 +29,7 @@ __all__ = (
 )
 
 
-class PaginatorOption(discord.SelectOption, Generic[PageT]):
+class PaginatorOption[PageT: Any](discord.SelectOption):
     """A subclass of :class:`discord.SelectOption` representing a page in a :class:`SelectOptionsPaginator`.
 
     Other parameters are the same as :class:`~.discord.SelectOption`.
@@ -47,15 +44,15 @@ class PaginatorOption(discord.SelectOption, Generic[PageT]):
 
     def __init__(
         self,
-        content: Union[PageT, Sequence[PageT]],
+        content: PageT | Sequence[PageT],
         *,
         label: str = discord.utils.MISSING,
-        emoji: Optional[Union[str, discord.Emoji, discord.PartialEmoji]] = None,
+        emoji: str | discord.Emoji | discord.PartialEmoji | None = None,
         value: str = discord.utils.MISSING,
-        description: Optional[str] = None,
+        description: str | None = None,
     ) -> None:
         super().__init__(label=label, value=value, description=description, emoji=emoji, default=False)
-        self.content: Union[PageT, Sequence[PageT]] = content
+        self.content: PageT | Sequence[PageT] = content
 
     def __repr__(self) -> str:
         return f"<PaginatorOption emoji={self.emoji!r} label={self.label!r} value={self.value!r}>"
@@ -119,7 +116,9 @@ class PaginatorOption(discord.SelectOption, Generic[PageT]):
         emoji = emoji or copy_from.emoji
 
         return cls(
-            content=page.content if isinstance(page, PaginatorOption) else page,  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
+            content=(
+                page.content if isinstance(page, PaginatorOption) else page
+            ),  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
             label=label,
             value=value,
             description=description,
@@ -127,7 +126,7 @@ class PaginatorOption(discord.SelectOption, Generic[PageT]):
         )
 
 
-class SelectOptionsPaginator(BaseClassPaginator[PageT]):
+class SelectOptionsPaginator[PageT](BaseClassPaginator[PageT]):
     """A paginator that uses discord.ui.Select to select pages.
 
     This paginator provides one select and two buttons to navigate through "pages" with options.
@@ -241,7 +240,9 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
     if TYPE_CHECKING:
         from ._types import BaseKwargs
 
-        async def get_page_kwargs(self, page: PaginatorOption[PageT]) -> BaseKwargs:  # pyright: ignore[reportIncompatibleMethodOverride] # dwai
+        async def get_page_kwargs(
+            self, page: PaginatorOption[PageT]
+        ) -> BaseKwargs:  # pyright: ignore[reportIncompatibleMethodOverride] # dwai
             ...
 
         pages: list[list[PaginatorOption[PageT]]]  # pyright: ignore[reportIncompatibleVariableOverride] # dwai
@@ -359,7 +360,9 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
 
         return res
 
-    async def format_page(self, page: PaginatorOption[PageT]) -> Union[PageT, Sequence[PageT]]:  # pyright: ignore[reportIncompatibleMethodOverride] # dwai
+    async def format_page(
+        self, page: PaginatorOption[PageT]
+    ) -> Union[PageT, Sequence[PageT]]:  # pyright: ignore[reportIncompatibleMethodOverride] # dwai
         """This method can be overridden to format the page before sending it.
         By default, it returns the page's content.
 
@@ -397,8 +400,12 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         """
         pass
 
-    def get_page(self, page_number: int) -> PaginatorOption[PageT]:  # pyright: ignore[reportIncompatibleMethodOverride] # dwai
-        pages: Sequence[PaginatorOption[PageT]] = super().get_page(page_number)  # pyright: ignore[reportAssignmentType] # it's a list of PaginatorOption
+    def get_page(
+        self, page_number: int
+    ) -> PaginatorOption[PageT]:  # pyright: ignore[reportIncompatibleMethodOverride] # dwai
+        pages: Sequence[PaginatorOption[PageT]] = super().get_page(
+            page_number
+        )  # pyright: ignore[reportAssignmentType] # it's a list of PaginatorOption
         option: PaginatorOption[PageT] = pages[self.current_option_index or 0]
         return option
 

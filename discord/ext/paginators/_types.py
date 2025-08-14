@@ -4,9 +4,9 @@ from typing import (
     Any,
     Generic,
     Optional,
+    TypeVar,
     TypedDict,
     Union,
-    TypeVar,
 )
 
 from collections.abc import Callable, Coroutine
@@ -17,27 +17,33 @@ if TYPE_CHECKING:
     from typing_extensions import NotRequired
 
     from .base_paginator import BaseClassPaginator
-
-    BaseClassPaginator = BaseClassPaginator[Any]
 else:
     BaseClassPaginator = Any
 
 
-PaginatorT = TypeVar("PaginatorT", bound=BaseClassPaginator)  # type: ignore
-PaginatorCheck = Callable[[PaginatorT, discord.Interaction[Any]], Union[bool, Coroutine[Any, Any, bool]]]
-Destination = Union[discord.abc.Messageable, discord.Interaction[Any]]
-PageT = TypeVar("PageT", covariant=True)
+if TYPE_CHECKING:
+    from .base_paginator import _PaginatorLayoutView, _PaginatorView
+else:
+    _PaginatorView = discord.ui.View
+    _PaginatorLayoutView = discord.ui.LayoutView
+
+type PaginatorCheck[PaginatorT: BaseClassPaginator[Any]] = Callable[
+    [PaginatorT, discord.Interaction[Any]], Union[bool, Coroutine[Any, Any, bool]]
+]
+type Destination = Union[discord.abc.Messageable, discord.Interaction[Any]]
+type Sequence[T] = list[T] | tuple[T, ...]
+type View = _PaginatorView | _PaginatorLayoutView
 
 
-class BaseKwargs(TypedDict):
-    content: Optional[str]
+class BaseKwargs(TypedDict, total=False):
+    content: str | None
     """Optional[:class:`str`]: Content of the page."""
     embeds: list[discord.Embed]
     """List[:class:`discord.Embed`]: Embeds of the page."""
-    view: discord.ui.View
+    view: discord.ui.View | discord.ui.LayoutView
     """View of the page. (the paginator)"""
 
-    files: NotRequired[list[Union[discord.File, discord.Attachment]]]
+    files: NotRequired[list[discord.File | discord.Attachment]]
     """NotRequired[List[:class:`discord.File`]]: Files of the page. Not always available like when using `edit`."""
     attachments: NotRequired[list[discord.File]]  # used in edit over files
     """NotRequired[List[Union[:class:`discord.File`, :class:`discord.Attachment`]]]: Attachments of the page. Not always available, probably only when using `edit`."""
@@ -45,14 +51,14 @@ class BaseKwargs(TypedDict):
     """NotRequired[:class:`bool`]: Whether to wait for the webhook message to be sent and returned. Only used in interaction followups."""
 
 
-class BasePaginatorKwargs(TypedDict, Generic[PaginatorT]):
+class BasePaginatorKwargs[PaginatorT: BaseClassPaginator[Any]](TypedDict):
     per_page: NotRequired[int]
     """
     The amount of pages to display per page.
     Defaults to ``1``.
 
-    E.g.: If ``per_page`` is ``2`` and ``pages`` is ``["1", "2", "3", "4"]``, then the message
-    will show ``["1", "2"]`` on the first page and ``["3", "4"]`` on the second page.
+    E.g.: If ``per_page`` is ``2`` and ``pages`` is ``[Page("1"), Page("2"), Page("3"), Page("4")]``, then the message
+    will show ``[Page("1"), Page("2")]`` on the first page and ``[Page("3"), Page("4")]`` on the second page.
     """
     author_id: NotRequired[Optional[int]]
     """
@@ -75,17 +81,17 @@ class BasePaginatorKwargs(TypedDict, Generic[PaginatorT]):
     Whether to always allow the bot owner to interact with the paginator.
     Defaults to ``True``.
     """
-    delete_after: NotRequired[bool]
+    delete_message_after: NotRequired[bool]
     """
     Whether to delete the message after the paginator stops. Only works if ``message`` is not ``None``.
     Defaults to ``False``.
     """
-    disable_after: NotRequired[bool]
+    disable_items_after: NotRequired[bool]
     """
     Whether to disable the paginator after the paginator stops. Only works if ``message`` is not ``None``.
     Defaults to ``False``.
     """
-    clear_buttons_after: NotRequired[bool]
+    clear_items_after: NotRequired[bool]
     """
     Whether to clear the buttons after the paginator stops. Only works if ``message`` is not ``None``.
     Defaults to ``False``.
@@ -104,8 +110,19 @@ class BasePaginatorKwargs(TypedDict, Generic[PaginatorT]):
     If the page is a string, it will be appended to the string.
     Else, it will be set as the content of the message.
     """
+    components_v2: NotRequired[bool]
+    """
+    Whether to use the v2 component system. See `pages` for more information.
+
+    Defaults to ``False``.
+    """
     timeout: NotRequired[Optional[Union[int, float]]]
     """
     The timeout for the paginator.
     Defaults to ``180.0``.
     """
+    pages_on_demand: NotRequired[bool]
+    cache_pages: NotRequired[bool]
+    max_cache_time: NotRequired[Optional[float]]
+    switch_pages_humanly: NotRequired[bool]
+    auto_wrap_in_actionrow: NotRequired[bool]

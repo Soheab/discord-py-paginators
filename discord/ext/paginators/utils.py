@@ -8,35 +8,26 @@ import io
 
 import discord
 
-if TYPE_CHECKING:
-    from discord.ext.commands import Bot
 
-
-# kinda like discord's is_owner method on commands.Bot
+# like discord's is_owner method on commands.Bot
 # but then for Client too and without setting any attributes
 # https://github.com/Rapptz/discord.py/blob/bd402b486cc12f0c1bf7377fd65f2fe0a8fabd73/discord/ext/commands/bot.py#L485-L535
-async def _fetch_bot_owner_ids(client: Union[discord.Client, Bot]) -> set[int]:  # type: ignore # unused
-    owner_ids: list[int] = []
+async def __get_bot_owner_ids(client: discord.Client) -> set[int]:  # pyright: ignore[reportUnusedFunction]
+    _owner_ids: list[int] = []
     if owner_id_attr := getattr(client, "owner_id", None):
-        owner_ids.append(owner_id_attr)
+        _owner_ids.append(owner_id_attr)
     if owner_ids_attr := getattr(client, "owner_ids", set[int]()):
-        owner_ids.extend(owner_ids_attr)
+        _owner_ids.extend(owner_ids_attr)
 
-    # support for team roles is added in dpy v2.4
-    if discord.version_info >= (2, 4):
-        team_class: Any = getattr(discord, "TeamMemberRole", None)
-        if team_class:
-            app: discord.AppInfo = client.application or await client.application_info()
-            if app.team:
-                owner_ids.extend(
-                    m.id
-                    for m in app.team.members
-                    if m.role in (team_class.admin, team_class.developer) and hasattr(m, "role")  # type: ignore
-                )
-            else:
-                owner_ids.append(app.owner.id)
+    app: discord.AppInfo = client.application or await client.application_info()
+    if app.team:
+        _owner_ids.extend(
+            m.id for m in app.team.members if m.role in (discord.TeamMemberRole.admin, discord.TeamMemberRole.developer)
+        )
+    else:
+        _owner_ids.append(app.owner.id)
 
-    return set(owner_ids)
+    return set(_owner_ids)
 
 
 def _check_parameters_amount(func: Callable[..., Any], amounts: tuple[int, ...], /) -> bool:  # type: ignore # unused
