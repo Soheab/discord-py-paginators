@@ -383,3 +383,85 @@ class SelectOptionsPaginator[PageT](BaseClassPaginator[PageT]):
     async def _send(self, *args: Any, **kwargs: Any) -> Optional[discord.Message]:
         self.update_select_state()
         return await super()._send(*args, **kwargs)
+
+    def __handle_options(self, options: list[PaginatorOption[Any]]) -> list[PaginatorOption[Any]]:
+        selected_values = set(self.select_page.values)
+        for option in options:
+            option.default = False
+
+        self.current_option_index = next(
+            (idx for idx, option in enumerate(options) if option.value in selected_values),
+            None,
+        )
+
+        if self.current_option_index is not None and self._default_on_select:
+            options[self.current_option_index].default = True
+        elif self._default_on_switch:
+            options[0].default = True
+            self.current_option_index = 0
+
+        return options
+
+    def _construct_options(
+        self, pages: list[list[PageT] | PageT], add_in_order: bool, default_option: Optional[discord.SelectOption]
+    ) -> list[list[PaginatorOption[PageT]]]:
+        """Constructs the options for the selects.
+
+        This will split the pages into chunks of ``per_select`` and each chunk will be a select.
+        If a chunk is a list, it will be treated as a single select and will not be split further.
+        If a chunk contains less or more items than ``per_select``, it will raise a ValueError.
+
+        Parameters
+        ----------
+        pages: List[List[PageT] | PageT]
+            The pages to construct the selects from.
+
+        Returns
+        -------
+        list[list[PaginatorOption[PageT]]]
+            A list of selects with options.
+        """
+        actual_construct: partial[PaginatorOption[PageT]] = partial(
+            PaginatorOption[PageT]._from_page, default_option=default_option
+        )
+
+        # separate function to ensure the inner page isn't a list/tuple
+        def construct_option(page: PageT) -> PaginatorOption[PageT]:
+            if isinstance(page, (list, tuple)):
+                # yes, I know this is a bit overkill, but it's for the sake of clarity (and a bit of fun/why not)
+                error_msg = (
+                    "Nested list/tuple as page is not allowed:"
+                    " \033[91m[..., [<page>, \033[91m\033[1m[<page>, <page>]\033[0m\033[91m, <page>], ...,]\033[0m vs"
+                    " \033[92m[..., \033[92m\033[1m[<page>, <page>, <page>, <page>]\033[0m\033[92m, ...,]\033[0m"
+                )
+                raise ValueError(error_msg)
+
+            return actual_construct(page)
+
+        res: list[list[PaginatorOption[PageT]]] = []
+
+        chunk: list[PaginatorOption[PageT]] = []
+
+        for page in pages.copy():
+            if isinstance(page, (list, tuple)):
+                if chunk and add_in_order:
+                    res.append(chunk)
+                    chunk = []
+
+                list_page: Union[list[PageT], tuple[PageT, ...]] = page
+                if len(list_page) > self.per_select:
+                    raise ValueError(
+                        f"Too many options for one select in nested list/tuple (max: {self.per_select}, got: {len(list_page)})"
+                    )
+
+                res.append([construct_option(page) for page in list_page])
+
+            else:
+                chunk.append(construct_option(page))
+                if len(chunk) >= self.per_select:
+                    res.append(chunk)
+                    chunk = []
+        if chunk:
+            res.append(chunk)
+
+        return res
