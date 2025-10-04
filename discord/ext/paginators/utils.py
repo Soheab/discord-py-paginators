@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union, Tuple
+from typing import Any, Union
 
 from collections.abc import Callable
 

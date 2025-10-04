@@ -1,15 +1,14 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, TypedDict, overload
+from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict, overload
 
 import discord
 
-from .base_paginator import BaseClassPaginator
-from . import utils as _utils
+from .core import BaseClassPaginator
 
 if TYPE_CHECKING:
     from typing_extensions import Unpack, Self
 
-    from ._types import BasePaginatorKwargs, Sequence, View, BaseKwargs
+    from ._types import BasePaginatorKwargs, View
 
     class ButtonsDict(TypedDict, total=False):
         label: str | None
@@ -84,9 +83,9 @@ class ChooseNumber(discord.ui.Modal):
 
         # type checker
         if not self.number_input.placeholder:
-            self.number_input.placeholder = f"Current: {paginator.current_page + 1}"
+            self.number_input.placeholder = f"Current: {paginator.current_page_index + 1}"
         else:
-            self.number_input.placeholder = self.number_input.placeholder.format(paginator.current_page + 1)
+            self.number_input.placeholder = self.number_input.placeholder.format(paginator.current_page_index + 1)
 
         self.value: Optional[int] = None
 
@@ -110,7 +109,7 @@ class ChooseNumber(discord.ui.Modal):
 
         number = int(self.number_input.value) - 1
 
-        if number == self.paginator.current_page:
+        if number == self.paginator.current_page_index:
             await interaction.response.send_message("That is the current page!", ephemeral=True)
             self.stop()
             return
@@ -176,7 +175,7 @@ class ChooseNumber(discord.ui.Modal):
 
 
 class PaginatorButton(
-    discord.ui.Button["View"],
+    discord.ui.Button["View[ButtonPaginator[Any]]"],
 ):
     """A button for the paginator.
 
@@ -194,7 +193,7 @@ class PaginatorButton(
         or whatever order discord.py adds them in.
     """
 
-    view: View  # pyright: ignore[reportIncompatibleMethodOverride]
+    view: View[ButtonPaginator[Any]]  # pyright: ignore[reportIncompatibleMethodOverride]
 
     def __init__(
         self,
@@ -221,29 +220,29 @@ class PaginatorButton(
             msg = "Something went wrong... view is None. Report this to my developer."
             raise ValueError(msg)
 
-        paginator: ButtonPaginator[Any] = self.view._get_parent()  # pyright: ignore[reportAssignmentType]
+        paginator = self.view.paginator
 
         # if isinstance(paginator, PageSwitcherAndStopButtonView):
         #    await paginator.callback(interaction, self)
         #    return
 
         if self.id == _KnownComponentIDs.STOP_BUTTON:
-            await paginator.stop_paginator(interaction)
+            await paginator.stop_paginator(interaction, is_timeout=False)
             return
 
-        next_page_number: int = paginator.current_page
+        next_page_number: int = paginator.current_page_index
 
         if self.id == _KnownComponentIDs.RIGHT_BUTTON:
             next_page_number += 1
         elif self.id == _KnownComponentIDs.LEFT_BUTTON:
             next_page_number -= 1
         elif self.id == _KnownComponentIDs.FIRST_BUTTON:
-            if paginator.current_page == 0:
+            if paginator.current_page_index == 0:
                 next_page_number = paginator.max_pages - 1
             else:
                 next_page_number = 0
         elif self.id == _KnownComponentIDs.LAST_BUTTON:
-            if paginator.current_page >= paginator.max_pages - 1:
+            if paginator.current_page_index >= paginator.max_pages - 1:
                 next_page_number = 0
             else:
                 next_page_number = paginator.max_pages - 1
@@ -262,19 +261,8 @@ class PaginatorButton(
 
         await paginator.switch_page(interaction, next_page_number)
 
-    def _copy(self) -> PaginatorButton:
-        """Create a copy of the button.
-
-        Returns
-        -------
-        :class:`.PaginatorButton`
-            A copy of the button.
-        """
-        return PaginatorButton(**self._original_kwargs)
-
 
 class ButtonsKwargsMeta(type):
-
     def __new__(
         cls,
         name: str,
@@ -297,7 +285,7 @@ class ButtonsKwargsMeta(type):
         return self
 
 
-class ButtonPaginator[PageT: Any](
+class ButtonPaginator[PageT](
     BaseClassPaginator[PageT],
     metaclass=ButtonsKwargsMeta,
 ):
@@ -382,6 +370,7 @@ class ButtonPaginator[PageT: Any](
         See other parameters on :class:`discord.ext.paginator.base_paginator.BaseClassPaginator`.
     """
 
+    # --- Class configuration -------------------------------------------------
     __buttons__: dict[ButtonKey, ButtonsDict | None] = {
         ButtonKey.FIRST: {
             "label": "First",
@@ -422,9 +411,10 @@ class ButtonPaginator[PageT: Any](
         },
     }
 
+    # --- Initialization ------------------------------------------------------
     def __init__(
         self,
-        pages: Sequence[PageT] = discord.utils.MISSING,
+        pages: list[PageT] = discord.utils.MISSING,
         *,
         buttons: ValidButtonsDict = {},
         always_show_stop_button: bool = False,
@@ -442,13 +432,11 @@ class ButtonPaginator[PageT: Any](
         kwargs["components_v2"] = kwargs.pop("components_v2", False) or any(
             [container, container_accent_colour, add_buttons_to_container]
         )
+        
 
         if buttons:
             valid_button_dict_keys: tuple[str, ...] = ("label", "style", "emoji", "position", "disabled")
-            hint = (
-                f"Consider using the @{self.__class__.__name__}.modify_button decorator on the class or the .edit_button method "
-                "to modify the default buttons instead."
-            )
+            hint = "Consider using the .edit_button method to modify the default buttons instead."
 
             if not isinstance(buttons, dict):
                 raise TypeError(f"'buttons' must be a dictionary. {hint}")
@@ -492,12 +480,15 @@ class ButtonPaginator[PageT: Any](
         self._container: discord.ui.Container[Any] | None = None
         self._button_actionrows: dict[int, discord.ui.ActionRow[Any]] = {}
 
+        self.__initial_container_items_count: int = 0
+
         if container not in (discord.utils.MISSING, False, None):
             if not isinstance(container, (discord.ui.Container, bool)):
                 raise TypeError("container must be a discord.ui.Container or True.")
 
             self._container = container if isinstance(container, discord.ui.Container) else discord.ui.Container()
-            self._container.id = _KnownComponentIDs.BUTTONS_CONTAINER
+            self._container.id = _KnownComponentIDs.CONTAINER
+            self.__initial_container_items_count = len(self._container.children)
 
         if container_accent_colour and self._container:
             self._container.accent_colour = container_accent_colour
@@ -506,6 +497,99 @@ class ButtonPaginator[PageT: Any](
             self._buttons_container = discord.ui.Container(id=_KnownComponentIDs.BUTTONS_CONTAINER)
 
         super().__init__(pages, **kwargs)
+
+    @property
+    def current_page_index(self) -> int:
+        return super().current_page_index
+
+    @current_page_index.setter
+    def current_page_index(self, value: int) -> None:
+        super(
+            __class__, type(self)
+        ).current_page_index.__set__(  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+            self, value
+        )
+        self._update_buttons_state()
+
+    @overload
+    def edit_button(
+        self,
+        key: ButtonKey,
+        /,
+        *,
+        label: str | None = discord.utils.MISSING,
+        style: discord.ButtonStyle = discord.utils.MISSING,
+        emoji: discord.Emoji | discord.PartialEmoji | str | None = discord.utils.MISSING,
+        position: int | None = discord.utils.MISSING,
+    ) -> None: ...
+
+    @overload
+    def edit_button(
+        self,
+        key: ButtonKey,
+        /,
+        *,
+        remove: Literal[True] = ...,
+    ) -> None: ...
+
+    def edit_button(
+        self,
+        key: ButtonKey,
+        /,
+        *,
+        label: str | None = discord.utils.MISSING,
+        style: discord.ButtonStyle = discord.utils.MISSING,
+        emoji: discord.Emoji | discord.PartialEmoji | str | None = discord.utils.MISSING,
+        position: int | None = discord.utils.MISSING,
+        remove: bool = False,
+    ) -> None:
+        options: ButtonsDict = {}
+        if label is not discord.utils.MISSING:
+            options["label"] = label
+        if style is not discord.utils.MISSING:
+            options["style"] = style
+        if emoji is not discord.utils.MISSING:
+            options["emoji"] = emoji
+        if position is not discord.utils.MISSING:
+            options["position"] = position
+
+        self.__edit_button(key, options if not remove else None)
+
+    def _after_handling_pages(self) -> None:
+        print("_after_handling_pages handling pages in ButtonPaginator")
+        print(
+            "adding buttons in ButtonPaginator",
+        )
+        self.__add_buttons()
+        print(
+            "ButtonPaginator buttons added",
+        )
+        super()._after_handling_pages()
+
+    def _clear_all_view_items(self) -> None:
+        if self._container:
+            for item in self._container.children[self.__initial_container_items_count :]:
+                self._container.remove_item(item)
+
+        if self._buttons_container:
+            self._buttons_container.clear_items()
+
+        super()._clear_all_view_items()
+
+    def _add_item(self, item: discord.ui.Item[Any]) -> discord.ui.Item[Any]:
+        if not isinstance(self.view, discord.ui.LayoutView):
+            return super()._add_item(item)
+
+        if isinstance(item, discord.ui.Container):
+            return super()._add_item(item)
+
+        target = self._container if self._container else self.view
+        target.add_item(item)
+
+        if self._container and self._container.children and self._container not in self.view.children:
+            self.view.add_item(self._container)
+
+        return item
 
     def __handle_always_show_stop_button(self) -> None:
         if not self.always_show_stop_button:
@@ -537,7 +621,7 @@ class ButtonPaginator[PageT: Any](
             return
 
         # Choose the correct target container
-        target: discord.ui.Container[Any] | View = self.view  # type: ignore
+        target: discord.ui.Container[Any] | View[Self] = self.view
         if self._add_buttons_to_container or self._buttons_container:
             if self._buttons_container:
                 target = self._buttons_container
@@ -635,7 +719,7 @@ class ButtonPaginator[PageT: Any](
             return
 
         _buttons: dict[ButtonKey, PaginatorButton] = {
-            key: button._copy() for key, button in self._buttons.copy().items() if button
+            key: button.copy() for key, button in self._buttons.copy().items() if button
         }
         sorted_buttons = sorted(_buttons.items(), key=self.__buttons_sort_key)
         for key, button in sorted_buttons:
@@ -694,103 +778,13 @@ class ButtonPaginator[PageT: Any](
                         button.label = f"{label} {self.max_pages}"
 
             if button.id in (_KnownComponentIDs.RIGHT_BUTTON, _KnownComponentIDs.LAST_BUTTON):
-                button.disabled = self.current_page >= (self.max_pages - 1) and not self.switch_pages_humanly
+                button.disabled = self.current_page_index >= (self.max_pages - 1) and not self.switch_pages_humanly
 
             elif button.id in (_KnownComponentIDs.LEFT_BUTTON, _KnownComponentIDs.FIRST_BUTTON):
-                button.disabled = self.current_page <= 0 and not self.switch_pages_humanly
+                button.disabled = self.current_page_index <= 0 and not self.switch_pages_humanly
 
             if self._style_if_clickable is not None:
                 if not button.disabled:
                     button.style = self._style_if_clickable
                 else:
                     button.style = original_button.style if original_button else discord.ButtonStyle.secondary
-
-    def _clear_all_view_items(self) -> None:
-        if self._container:
-            self._container.clear_items()
-        if self._buttons_container:
-            self._buttons_container.clear_items()
-
-        super()._clear_all_view_items()
-
-    def _add_item(self, item: discord.ui.Item[Any]) -> discord.ui.Item[Any]:
-        if not isinstance(self.view, discord.ui.LayoutView):
-            return super()._add_item(item)
-
-        if isinstance(item, discord.ui.Container):
-            return super()._add_item(item)
-
-        target = self._container if self._container else self.view
-        target.add_item(item)
-
-        if self._container and self._container.children and self._container not in self.view.children:
-            self.view.add_item(self._container)
-
-        return item
-
-    @property
-    def current_page(self) -> int:
-        return super().current_page
-
-    @current_page.setter
-    def current_page(self, value: int) -> None:
-        super(
-            __class__, type(self)
-        ).current_page.__set__(  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
-            self, value
-        )
-        self._update_buttons_state()
-
-    def _after_handling_pages(self) -> None:
-        print("_after_handling_pages handling pages in ButtonPaginator")
-        print(
-            "adding buttons in ButtonPaginator",
-        )
-        self.__add_buttons()
-        print(
-            "ButtonPaginator buttons added",
-        )
-
-    @overload
-    def edit_button(
-        self,
-        key: ButtonKey,
-        /,
-        *,
-        label: str | None = discord.utils.MISSING,
-        style: discord.ButtonStyle = discord.utils.MISSING,
-        emoji: discord.Emoji | discord.PartialEmoji | str | None = discord.utils.MISSING,
-        position: int | None = discord.utils.MISSING,
-    ) -> None: ...
-
-    @overload
-    def edit_button(
-        self,
-        key: ButtonKey,
-        /,
-        *,
-        remove: Literal[True] = ...,
-    ) -> None: ...
-
-    def edit_button(
-        self,
-        key: ButtonKey,
-        /,
-        *,
-        label: str | None = discord.utils.MISSING,
-        style: discord.ButtonStyle = discord.utils.MISSING,
-        emoji: discord.Emoji | discord.PartialEmoji | str | None = discord.utils.MISSING,
-        position: int | None = discord.utils.MISSING,
-        remove: bool = False,
-    ) -> None:
-        options: ButtonsDict = {}
-        if label is not discord.utils.MISSING:
-            options["label"] = label
-        if style is not discord.utils.MISSING:
-            options["style"] = style
-        if emoji is not discord.utils.MISSING:
-            options["emoji"] = emoji
-        if position is not discord.utils.MISSING:
-            options["position"] = position
-
-        self.__edit_button(key, options if not remove else None)

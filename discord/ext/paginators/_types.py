@@ -16,13 +16,13 @@ import discord
 if TYPE_CHECKING:
     from typing_extensions import NotRequired
 
-    from .base_paginator import BaseClassPaginator
+    from .core import BaseClassPaginator
 else:
     BaseClassPaginator = Any
 
 
 if TYPE_CHECKING:
-    from .base_paginator import _PaginatorLayoutView, _PaginatorView
+    from .core import PaginatorLayoutView as _PaginatorLayoutView, PaginatorView as _PaginatorView
 else:
     _PaginatorView = discord.ui.View
     _PaginatorLayoutView = discord.ui.LayoutView
@@ -31,24 +31,23 @@ type PaginatorCheck[PaginatorT: BaseClassPaginator[Any]] = Callable[
     [PaginatorT, discord.Interaction[Any]], Union[bool, Coroutine[Any, Any, bool]]
 ]
 type Destination = Union[discord.abc.Messageable, discord.Interaction[Any]]
-type Sequence[T] = list[T] | tuple[T, ...]
-type View = _PaginatorView | _PaginatorLayoutView
+type View[PaginatorT: BaseClassPaginator[Any]] = _PaginatorView[PaginatorT] | _PaginatorLayoutView[PaginatorT]
 
 
 class BaseKwargs(TypedDict, total=False):
-    content: str | None
-    """Optional[:class:`str`]: Content of the page."""
-    embeds: list[discord.Embed]
-    """List[:class:`discord.Embed`]: Embeds of the page."""
     view: discord.ui.View | discord.ui.LayoutView
     """View of the page. (the paginator)"""
+    content: NotRequired[str | None]
+    """Optional[:class:`str`]: Content of the page."""
+    embeds: NotRequired[list[discord.Embed]]
+    """List[:class:`discord.Embed`]: Embeds of the page."""
 
     files: NotRequired[list[discord.File | discord.Attachment]]
     """NotRequired[List[:class:`discord.File`]]: Files of the page. Not always available like when using `edit`."""
     attachments: NotRequired[list[discord.File]]  # used in edit over files
     """NotRequired[List[Union[:class:`discord.File`, :class:`discord.Attachment`]]]: Attachments of the page. Not always available, probably only when using `edit`."""
-    wait: NotRequired[bool]  # webhook/followup
-    """NotRequired[:class:`bool`]: Whether to wait for the webhook message to be sent and returned. Only used in interaction followups."""
+    allowed_mentions: NotRequired[discord.AllowedMentions | None]
+    """Optional[:class:`discord.AllowedMentions`]: Allowed mentions of the page."""
 
 
 class BasePaginatorKwargs[PaginatorT: BaseClassPaginator[Any]](TypedDict):
@@ -121,8 +120,19 @@ class BasePaginatorKwargs[PaginatorT: BaseClassPaginator[Any]](TypedDict):
     The timeout for the paginator.
     Defaults to ``180.0``.
     """
-    pages_on_demand: NotRequired[bool]
-    cache_pages: NotRequired[bool]
-    max_cache_time: NotRequired[Optional[float]]
     switch_pages_humanly: NotRequired[bool]
-    auto_wrap_in_actionrow: NotRequired[bool]
+
+    allowed_mentions: NotRequired[discord.AllowedMentions | bool | None]
+    """
+    Controls the :class:`discord.AllowedMentions` for the paginator's messages.
+    Handy for v2 components where mentions do notify by default.
+
+    Here are the options:
+    - ``None``: Does not set allowed mentions, so the default or whatever you've set is 
+        used. E.g. passing ``allowed_mentions`` to the send method.
+    - ``discord.AllowedMentions``: Uses the provided allowed mentions.
+    - ``True``: Uses ``discord.AllowedMentions.all()``.
+    - ``False``: Uses ``discord.AllowedMentions.none()``.
+
+    Defaults to ``None``.
+    """
