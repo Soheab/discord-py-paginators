@@ -28,10 +28,10 @@ Discord = "https://discord.gg/yCzcfju"
 
 [project.optional-dependencies]
 docs = [
-    "sphinx>=7.0.0,<8.0.0",
-    "furo>=2023.9.10,<2024.0.0", # theme // https://pradyunsg.me/furo/customisation/announcement/
-    "sphinx-autodoc-typehints>=1.25.0,<2.0.0",  # https://github.com/tox-dev/sphinx-autodoc-typehints
-    "sphinx-toolbox>=3.5,<4.0",  # https://sphinx-toolbox.readthedocs.io/en/latest/extensions/index.html
+    "sphinx>=8.2.3,<9.0.0",
+    "furo>=2025.9.25,<2026.0.0", # theme // https://pradyunsg.me/furo/customisation/announcement/
+    "sphinx-autodoc-typehints>=3.2.0,<4.0.0",  # https://github.com/tox-dev/sphinx-autodoc-typehints
+    "sphinx-toolbox>=4.0,<5.0",  # https://sphinx-toolbox.readthedocs.io/en/latest/extensions/index.html
 ]
 dev = ["black", "ruff", "typing_extensions", "pyright"]
 
