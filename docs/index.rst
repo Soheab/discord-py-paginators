@@ -21,6 +21,9 @@ Installation
 
 Stable
 ~~~~~~~
+
+From `PyPI <https://pypi.org/project/discord-py-paginators/>`_:
+
 .. code-block:: bash
 
    python -m pip install discord-py-paginators
