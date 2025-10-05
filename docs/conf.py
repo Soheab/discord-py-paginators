@@ -61,6 +61,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "furo"
 html_static_path = ["_static"]
+html_css_files = ["custom.css"]
 
 
 # autodoc
@@ -87,6 +88,12 @@ simplify_optional_unions = False
 
 # sphinx_toolbox.more_autodoc.typevars
 all_typevars = True
+
+# Custom RST roles
+rst_prolog = """
+.. role:: param
+   :class: param-role
+"""
 
 # intersphinx
 # https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html
