@@ -13,5 +13,5 @@ __all__: Tuple[str, ...] = (
 
 
 __author__ = "Soheab_"
-__version__ = "0.3.0"
+__version__ = "0.4.0a"
 __license__ = "MPL-2.0"
