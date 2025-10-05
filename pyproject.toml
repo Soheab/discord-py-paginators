@@ -34,7 +34,6 @@ docs = [
     "sphinx-toolbox>=3.5,<4.0",  # https://sphinx-toolbox.readthedocs.io/en/latest/extensions/index.html
 ]
 dev = ["black", "ruff", "typing_extensions", "pyright"]
-modalpaginator = ["discord-ext-modal-paginator"]
 
 [tool.setuptools]
 packages = ["discord", "discord.ext", "discord.ext.paginators"]
