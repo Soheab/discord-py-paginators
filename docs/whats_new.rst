@@ -4,6 +4,71 @@ Changelogs
 ===========
 This page keeps a human-readable changelog of significant changes to the project.
 
+0.3.0 (2025-10-05)
+-------------------
+
+Long overdue release with bug fixes and improvements.
+
+.. warning::
+     This is the last *.X.* release that will support Python 3.9, 3.10, and 3.11.
+     The next major release will only support Python 3.12 and above.
+
+     This is also the last release to support discord.py 2.2+. Future releases will only support the LATEST discord.py version
+     available on `PyPI <https://pypi.org/project/discord.py/>`_.
+
+
+Added
+~~~~~~
+
+- Added :meth:`.BaseClassPaginator.on_page` hook for overriding page change behavior.
+- Added :param:`style_if_clickable` parameter to :class:`.ButtonPaginator` to customize the style of buttons when they are clickable.
+     - Defaults to :attr:`discord.ButtonStyle.green`.
+     - Can be set to ``None`` to maintain the default button style.
+- Added :param:`add_in_order` parameter to :class:`.SelectOptionsPaginator` to control whether options are added in the order they are defined.
+     - Defaults to ``False``.
+- Added :param:`set_default_on_switch` parameter to :class:`.SelectOptionsPaginator` to control whether the default option is set when switching pages.
+     - Defaults to ``True``.
+- Added :param:`set_default_on_select` parameter to :class:`.SelectOptionsPaginator` to control whether the default option is set when an option is selected.
+     - Defaults to ``True``.
+- Added :meth:`.SelectOptionsPaginator.on_select` hook for overriding.
+
+Removed
+~~~~~~~~
+
+- Deprecated the :param:`default_option` parameter from :class:`.SelectOptionsPaginator`.
+     - Use a :class:`.PaginatorOption` instance instead.
+- The ``modal_paginator`` module and ``[modalpaginator]`` extra have been removed.
+     - Please use the `discord-ext-modal-paginator <https://pypi.org/project/discord-ext-modal-paginator/>`_ package as an alternative.
+
+Bug Fixes
+~~~~~~~~~~
+
+- Fixed :meth:`.BaseClassPaginator.interaction_check` incorrectly returning ``True`` for non-owners when :param:`.BaseClassPaginator.always_allow_bot_owner` is set to ``True``.
+- Fixed issues where files and attachments would not render correctly when navigating between pages.
+- Fixed a bug where the paginator would not stop properly when the associated message was deleted.
+
+Miscellaneous
+~~~~~~~~~~~~~~
+
+- All paginators can now be imported directly from ``discord.ext.paginators``.
+     - For example: ``from discord.ext.paginators import ButtonPaginator, SelectOptionsPaginator``
+- Added missing parameters to ``BasePaginatorKwargs`` and included comprehensive docstrings.
+- The :attr:`.BaseClassPaginator.current_page`, :attr:`.BaseClassPaginator.pages`, and :attr:`.BaseClassPaginator.per_page` attributes can now be modified after initialization.
+- Improved the internal logic for editing and deleting messages.
+- Refactored :class:`.SelectOptionsPaginator` for enhanced reliability and reduced error potential.
+     - :meth:`.BaseClassPaginator.format_page` now receives the selected :class:`.PaginatorOption` instance instead of the page's raw contents.
+- Refactored :class:`.SelectOptionsPaginator` to be more reliable and less error-prone.
+  - :meth:`.BaseClassPaginator.format_page` now gets called with the :class:`.PaginatorOption` that was selected instead of the page's contents.
+- Updated documentation to the latest versions.
+
+  - Sphinx from 7+ < 8 to 8.2.3+ < 9
+  - furo (theme) from 2023.9.10+ < 2024 to 2025.9.25 < 2026
+  - sphinx-autodoc-typehints from 1.25+ < 2 to 3.2+ < 4
+  - sphinx-toolbox from 3.5 < 4 to 4.0 < 5
+
+Support for components v2 is in the works! Join the `Discord server <https://discord.gg/yCzcfju>`_ for updates and testing.
+
+
 0.2.1 (2024-07-24)
 -------------------
 

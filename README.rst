@@ -33,7 +33,7 @@ Usage
 
    import discord
    from discord.ext import commands
-   from discord.ext.paginators.button_paginator import ButtonPaginator
+   from discord.ext.paginators import ButtonPaginator
 
    bot = commands.Bot(command_prefix=commands.when_mentioned, intents=discord.Intents(guilds=True, messages=True))
 

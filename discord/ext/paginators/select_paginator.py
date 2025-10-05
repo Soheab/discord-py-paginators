@@ -214,7 +214,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
 
         Make sure to experiment with this to see what fits your needs the best.
 
-        .. versionadded:: 0.2.2
+        .. versionadded:: 0.3.0
     set_default_on_switch: :class:`bool`
         Whether to set the first option of each "page" as the default option.
 
@@ -222,11 +222,11 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
 
         Defaults to ``True``.
 
-        .. versionadded:: 0.2.2
+        .. versionadded:: 0.3.0
     set_default_on_select: :class:`bool`
         Whether to set the selected option as the default option. Defaults to ``True``.
 
-        .. versionadded:: 0.2.2
+        .. versionadded:: 0.3.0
     default_option: Optional[:class:`discord.SelectOption`]
         The option to get the metadata from if the a page is not an instance of :class:`PaginatorOption`.
         If this is ``None``, it will try to get the metadata from the page itself.
@@ -234,7 +234,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
 
         Defaults to ``None``.
 
-        .. deprecated:: 0.2.2
+        .. deprecated:: 0.3.0
             This parameter is deprecated and will be removed in a future version. It is recommended to use :class:`PaginatorOption` instead.
     """
 
@@ -272,7 +272,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
 
             warnings.warn(
                 (
-                    "The 'default_option' parameter is deprecated since v0.2.2 and will be removed in a future version. "
+                    "The 'default_option' parameter is deprecated since v0.3.0 and will be removed in a future version. "
                     "It is recommended to use PaginatorOption instead."
                 ),
                 DeprecationWarning,
@@ -370,7 +370,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
 
             Use the ``content`` attribute to get the contents of the page.
 
-            .. versionchanged:: 0.2.2
+            .. versionchanged:: 0.3.0
                 This is now the selected option instead of the page's contents.
 
         Returns
@@ -386,7 +386,7 @@ class SelectOptionsPaginator(BaseClassPaginator[PageT]):
         This method can be overridden to provide custom behavior when an option is selected.
         This method is called after the select is updated and does nothing by default.
 
-        .. versionadded:: 0.2.2
+        .. versionadded:: 0.3.0
 
         Parameters
         ----------

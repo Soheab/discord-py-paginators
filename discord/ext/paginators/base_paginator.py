@@ -229,6 +229,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         """This method is called when the paginator times out.
 
         This method does the following checks (in order):
+
         - Calls :meth:`.BaseClassPaginator.stop_paginator`.
         - Calls :meth:`discord.ui.View.on_timeout`.
         """

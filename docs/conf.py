@@ -114,6 +114,8 @@ nitpick_ignore = [
     ("py:class", "ButtonPaginator[Any]"),
     ("py:class", "typing.Unpack"),
     ("py:class", "discord.ext.paginators.button_paginator.PageSwitcherAndStopButtonView"),
+    ("py:class", "TypeAliasForwardRef"),
+    ("py:class", "'Any'"),
     # ????? idk about these, these are from discord.py
     # fixes:
     # <unknown>:1: WARNING: py:data reference target not found: typing.Union`[:py:class:`~discord.emoji.Emoji
