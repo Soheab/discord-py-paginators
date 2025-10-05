@@ -423,9 +423,9 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         # Sequence
         if isinstance(page, (list, tuple)):
             inner_page: Any
-            for inner_page in page:
+            for inner_page in page: # type: ignore
                 # handles the page kwargs
-                await self.get_page_kwargs(inner_page, skip_formatting=True)
+                await self.get_page_kwargs(inner_page, skip_formatting=True) # type: ignore
 
         if isinstance(page, (int, str)):
             if self.__base_kwargs["content"]:
@@ -444,7 +444,7 @@ class BaseClassPaginator(discord.ui.View, Generic[PageT]):
         elif isinstance(page, dict):
             # kinda the same thing as above but it didn't appricate that it
             # didn't know the type of the key&value so it was "dict[Unknown, Unknown]"
-            data: dict[Any, Any] = page.copy()
+            data: dict[Any, Any] = page.copy() # type: ignore
             self.__base_kwargs.update(data)
 
         return self.__base_kwargs
