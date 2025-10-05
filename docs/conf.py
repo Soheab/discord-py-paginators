@@ -15,7 +15,7 @@ project = "discord-py-paginators"
 # source:
 # https://github.com/Rapptz/discord.py/blob/61eddfcb189f11a293011d43b09fe4ec52641dd2/docs/conf.py#L95C1-L100C18
 version = "0.0.0"
-author = "Unknown Author"
+author = "Soheab_"
 try:
     with open("../discord/ext/paginators/__init__.py") as f:
         read = f.read()
