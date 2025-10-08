@@ -15,7 +15,7 @@ project = "discord-py-paginators"
 # source:
 # https://github.com/Rapptz/discord.py/blob/61eddfcb189f11a293011d43b09fe4ec52641dd2/docs/conf.py#L95C1-L100C18
 version = "0.0.0"
-author = "Unknown Author"
+author = "Soheab_"
 try:
     with open("../discord/ext/paginators/__init__.py") as f:
         read = f.read()
@@ -61,6 +61,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 html_theme = "furo"
 html_static_path = ["_static"]
+html_css_files = ["custom.css"]
 
 
 # autodoc
@@ -88,6 +89,12 @@ simplify_optional_unions = False
 # sphinx_toolbox.more_autodoc.typevars
 all_typevars = True
 
+# Custom RST roles
+rst_prolog = """
+.. role:: param
+   :class: param-role
+"""
+
 # intersphinx
 # https://www.sphinx-doc.org/en/master/usage/extensions/intersphinx.html
 intersphinx_mapping = {
@@ -107,6 +114,8 @@ nitpick_ignore = [
     ("py:class", "ButtonPaginator[Any]"),
     ("py:class", "typing.Unpack"),
     ("py:class", "discord.ext.paginators.button_paginator.PageSwitcherAndStopButtonView"),
+    ("py:class", "TypeAliasForwardRef"),
+    ("py:class", "'Any'"),
     # ????? idk about these, these are from discord.py
     # fixes:
     # <unknown>:1: WARNING: py:data reference target not found: typing.Union`[:py:class:`~discord.emoji.Emoji

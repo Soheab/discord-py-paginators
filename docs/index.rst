@@ -21,6 +21,9 @@ Installation
 
 Stable
 ~~~~~~~
+
+From `PyPI <https://pypi.org/project/discord-py-paginators/>`_:
+
 .. code-block:: bash
 
    python -m pip install discord-py-paginators
@@ -41,7 +44,7 @@ Usage
 
    import discord
    from discord.ext import commands
-   from discord.ext.paginators.button_paginator import ButtonPaginator
+   from discord.ext.paginators import ButtonPaginator
 
    bot = commands.Bot(command_prefix=commands.when_mentioned, intents=discord.Intents(guilds=True, messages=True))
 
