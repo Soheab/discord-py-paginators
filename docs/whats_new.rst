@@ -4,6 +4,45 @@ Changelogs
 ===========
 This page keeps a human-readable changelog of significant changes to the project.
 
+1.0.0 (2025-12-31)
+-------------------
+
+Big release with many new features, improvements, bug fixes and breaking changes. Including support for Discord's Components v2.
+
+Breaking Changes
++++++++++++++++++
+
+- The package now requires ``discord.py v2.7.0``.
+- None of the paginators subclasses View or LayoutView anymore.
+
+  - You can pass a custom view class using the ``view_cls`` parameter instead.
+  - You can get the view instance using the ``view`` attribute.
+  - Everything else still functions the same.
+
+- ``combine_switcher_and_stop_buttons`` has been removed from :class:`.ButtonPaginator`.
+
+- ``delete_after``, ``disable_after`` and ``clear_buttons_after`` have been removed from :class:`.BaseClassPaginator`.
+
+  - Use the ``after_timeout`` and ``after_stop`` parameters with the appropriate :class:`.AfterAction` enum value instead.
+
+
+- The ``override_page_kwargs`` kwarg for :meth:`.BaseClassPaginator.send` has been removed.
+
+  - It was entirely redundant.
+
+- ``always_allow_bot_owner`` now defaults to ``False`` instead of ``True``.
+
+  - This is to prevent unexpected behavior.
+
+- ``current_page`` has been removed in favor of :attr:`.BaseClassPaginator.current_page_index`.
+
+  - This better reflects what the attribute actually is.
+  - ``current_pages`` has been added to get the current page's content.
+
+- For ``always_allow_bot_owner``, if :attr:`discord.Interaction.client` is an instance of :class:`discord.ext.commands.Bot`,
+  it will use the bot's :meth:`discord.ext.commands.Bot.is_owner` method to check for ownership.
+  Otherwise, it will get the ids and team roles itself and store it on a private attribute when used for the first time.
+
 0.3.0 (2025-10-05)
 -------------------
 
@@ -18,22 +57,26 @@ Long overdue release with bug fixes and improvements.
 
 
 Added
-~~~~~~
+++++++
 
 - Added :meth:`.BaseClassPaginator.on_page` hook for overriding page change behavior.
 - Added :param:`style_if_clickable` parameter to :class:`.ButtonPaginator` to customize the style of buttons when they are clickable.
-     - Defaults to :attr:`discord.ButtonStyle.green`.
-     - Can be set to ``None`` to maintain the default button style.
+  
+  - Defaults to :attr:`discord.ButtonStyle.green`.
+  - Can be set to ``None`` to maintain the default button style.
 - Added :param:`add_in_order` parameter to :class:`.SelectOptionsPaginator` to control whether options are added in the order they are defined.
-     - Defaults to ``False``.
+  
+  - Defaults to ``False``.
 - Added :param:`set_default_on_switch` parameter to :class:`.SelectOptionsPaginator` to control whether the default option is set when switching pages.
-     - Defaults to ``True``.
+  
+  - Defaults to ``True``.
 - Added :param:`set_default_on_select` parameter to :class:`.SelectOptionsPaginator` to control whether the default option is set when an option is selected.
-     - Defaults to ``True``.
+  
+  - Defaults to ``True``.
 - Added :meth:`.SelectOptionsPaginator.on_select` hook for overriding.
 
 Removed
-~~~~~~~~
++++++++
 
 - Deprecated the :param:`default_option` parameter from :class:`.SelectOptionsPaginator`.
      - Use a :class:`.PaginatorOption` instance instead.
@@ -41,19 +84,19 @@ Removed
      - Please use the `discord-ext-modal-paginator <https://pypi.org/project/discord-ext-modal-paginator/>`_ package as an alternative.
 
 Bug Fixes
-~~~~~~~~~~
+++++++++++
 
 - Fixed :meth:`.BaseClassPaginator.interaction_check` incorrectly returning ``True`` for non-owners when :param:`.BaseClassPaginator.always_allow_bot_owner` is set to ``True``.
 - Fixed issues where files and attachments would not render correctly when navigating between pages.
 - Fixed a bug where the paginator would not stop properly when the associated message was deleted.
 
 Miscellaneous
-~~~~~~~~~~~~~~
+++++++++++++++
 
 - All paginators can now be imported directly from ``discord.ext.paginators``.
      - For example: ``from discord.ext.paginators import ButtonPaginator, SelectOptionsPaginator``
 - Added missing parameters to ``BasePaginatorKwargs`` and included comprehensive docstrings.
-- The :attr:`.BaseClassPaginator.current_page`, :attr:`.BaseClassPaginator.pages`, and :attr:`.BaseClassPaginator.per_page` attributes can now be modified after initialization.
+- The :attr:`.BaseClassPaginator.current_page_index`, :attr:`.BaseClassPaginator.pages`, and :attr:`.BaseClassPaginator.per_page` attributes can now be modified after initialization.
 - Improved the internal logic for editing and deleting messages.
 - Refactored :class:`.SelectOptionsPaginator` for enhanced reliability and reduced error potential.
      - :meth:`.BaseClassPaginator.format_page` now receives the selected :class:`.PaginatorOption` instance instead of the page's raw contents.
@@ -86,7 +129,7 @@ Rather small release with only bug fixes.
 Many Quality of Life improvements and bug fixes.
 
 Changes per module
-~~~~~~~~~~~~~~~~~~~
+++++++++++++++++++
 
 errors
 +++++++
@@ -115,7 +158,7 @@ Bug Fixes:
 Changes:
 
 - ``NoPages`` exception has been replaced by a :exc:`ValueError`.
-- :attr:`.BaseClassPaginator.current_page`'s setter now sets it to the maximum/minimum page if it's out of bounds.
+- :attr:`.BaseClassPaginator.current_page_index`'s setter now sets it to the maximum/minimum page if it's out of bounds.
 - | :meth:`.BaseClassPaginator.interaction_check` & :meth:`.BaseClassPaginator.format_page` now call a private method 
      instead of directly doing the work in the method. This allows for easier overriding.
 - :class:`.BaseClassPaginator` is no longer slotted. This did nothing anyways since :class:`discord.ui.View` is not slotted.

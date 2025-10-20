@@ -1,9 +1,633 @@
-/* Custom styles for documentation */
+/*
+    Apple-style "Liquid Glass" theme for Sphinx (Furo)
+    Single-file override so it’s easy to revert. Remove this file or comment blocks to undo.
 
-.param-role {
+    Goals:
+    - Frosted glass surfaces with subtle borders and shadows
+    - Soft, layered gradient background with faint blobs
+    - Respect light/dark mode (Furo’s body[data-theme])
+    - Minimal risk: don’t change layout/HTML, only visuals
+*/
+
+/* ------------------------------
+     Foundation: variables per mode
+     ------------------------------ */
+
+/* Light mode defaults */
+body,
+body[data-theme="light"] {
+    /* Background gradients */
+    --liquid-bg: radial-gradient(1200px 800px at 10% -10%, rgba(86, 132, 255, 0.20), transparent 60%),
+        radial-gradient(900px 700px at 110% 10%, rgba(255, 151, 206, 0.18), transparent 55%),
+        radial-gradient(600px 500px at 50% 120%, rgba(120, 255, 214, 0.18), transparent 60%),
+        linear-gradient(180deg, #f6f8fb 0%, #eef2f7 100%);
+
+    /* Glass tokens */
+    --glass-bg: rgba(255, 255, 255, 0.35);
+    --glass-bg-soft: rgba(255, 255, 255, 0.25);
+    --glass-bg-sidebar: rgba(255, 255, 255, 0.15);
+    --glass-bg-code: rgba(255, 255, 255, 0.45);
+    --glass-border: rgba(150, 160, 180, 0.20);
+    --glass-shadow: 0 10px 30px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+    --text-shadow-light: 0 1px 2px rgba(255, 255, 255, 0.8);
+    /* Ink + accents use existing Furo vars where possible */
+    --ink-1: var(--color-foreground-primary, #0b1220);
+    --ink-2: var(--color-foreground-secondary, #344053);
+    --accent: var(--color-brand-primary, #3776AB);
+    --link: var(--color-link, var(--accent));
+
+    /* Make Furo backgrounds transparent; we’ll paint surfaces as glass instead */
+    --color-background-primary: transparent;
+    --color-background-secondary: transparent;
+    --color-background-hover: rgba(0, 0, 0, 0.04);
+}
+
+/* Dark mode */
+body[data-theme="dark"] {
+    --liquid-bg: radial-gradient(1200px 800px at -10% -10%, rgba(60, 120, 255, 0.25), transparent 60%),
+        radial-gradient(900px 700px at 110% 0%, rgba(255, 100, 180, 0.20), transparent 55%),
+        radial-gradient(700px 600px at 50% 120%, rgba(80, 240, 200, 0.20), transparent 60%),
+        linear-gradient(180deg, #0f1320 0%, #0a0f1a 100%);
+
+    --glass-bg: rgba(17, 25, 40, 0.35);
+    --glass-bg-soft: rgba(17, 25, 40, 0.25);
+    --glass-bg-sidebar: rgba(17, 25, 40, 0.15);
+    --glass-bg-code: rgba(17, 25, 40, 0.50);
+    --glass-border: rgba(255, 255, 255, 0.04);
+    --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
+    --text-shadow-dark: 0 1px 3px rgba(0, 0, 0, 0.9);
+    --ink-1: var(--color-foreground-primary, #e6eaf2);
+    --ink-2: var(--color-foreground-secondary, #b8c1d4);
+    --accent: var(--color-brand-primary, #FFD43B);
+    --link: var(--color-link, var(--accent));
+
+    --color-background-primary: transparent;
+    --color-background-secondary: transparent;
+    --color-background-hover: rgba(255, 255, 255, 0.06);
+}
+
+/* Paint the page background */
+html,
+body {
+    background: var(--liquid-bg) fixed;
+    background-attachment: fixed;
+}
+
+/* ------------------------------
+     Reusable glass surface helper
+     ------------------------------ */
+.liquid-glass {
+    /* helper class (not applied in HTML; used by selectors below) */
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
+/* Rounded corners shared across major surfaces */
+.liquid-rounded {
+    border-radius: 16px;
+}
+
+/* ------------------------------
+     Major layout containers
+     ------------------------------ */
+
+/* Mobile top bar */
+.mobile-header {
+    /* glass */
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border-bottom: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
+/* Left sidebar */
+.sidebar-drawer .sidebar-container {
+    background: rgba(255, 255, 255, 0.35);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+    border-right: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
+body[data-theme="dark"] .sidebar-drawer .sidebar-container {
+    background: rgba(17, 25, 40, 0.45);
+}
+
+/* Right ToC sidebar */
+.toc-drawer .toc-sticky {
+    background: rgba(255, 255, 255, 0.35);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+    border-left: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: 16px;
+}
+
+body[data-theme="dark"] .toc-drawer .toc-sticky {
+    background: rgba(17, 25, 40, 0.45);
+}
+
+/* Main article container feels like a card on the liquid background */
+.content .article-container {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: 18px;
+    padding: 32px 48px;
+}
+
+/* Leave some breathing room so the background shows through */
+.content {
+    padding: 24px;
+}
+
+/* Announcement banner */
+.announcement {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.0)), var(--glass-bg);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border-bottom: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+}
+
+.announcement .announcement-content {
+    color: var(--ink-1);
+}
+
+/* Related pages footer strip */
+.related-pages {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: 14px;
+    padding: 20px;
+    margin: 24px 0;
+}
+
+/* Bottom of page details */
+footer .bottom-of-page {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    border-radius: 12px;
+    padding: 20px 24px;
+}
+
+/* Sidebar brand and search feel like smaller glass chips */
+.sidebar-brand,
+.sidebar-search-container,
+.sidebar-tree {
+    background: rgba(255, 255, 255, 0.25);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    box-shadow: var(--glass-shadow);
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+body[data-theme="dark"] .sidebar-brand,
+body[data-theme="dark"] .sidebar-search-container,
+body[data-theme="dark"] .sidebar-tree {
+    background: rgba(17, 25, 40, 0.35);
+}
+
+.sidebar-search {
+    background: transparent !important;
+    color: var(--ink-1);
+}
+
+.sidebar-search::placeholder {
+    color: var(--ink-2);
+}
+
+/* Sidebar brand text */
+.sidebar-brand-text {
+    font-weight: 600;
+    color: var(--ink-1) !important;
+}
+
+/* Sidebar captions */
+.sidebar-tree .caption,
+.toc-tree .caption {
+    font-weight: 600;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 8px 10px;
+    margin-top: 12px;
+    color: var(--ink-1) !important;
+}
+
+body[data-theme="light"] .sidebar-tree .caption,
+body[data-theme="light"] .toc-tree .caption {
+    color: #0d1829 !important;
+}
+
+body[data-theme="dark"] .sidebar-tree .caption,
+body[data-theme="dark"] .toc-tree .caption {
+    color: #f5f8ff !important;
+}
+
+/* Back to top chip */
+.back-to-top {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    box-shadow: var(--glass-shadow);
+}
+
+/* ------------------------------
+     Typography & links
+     ------------------------------ */
+
+article,
+.content {
+    color: var(--ink-1);
+}
+
+/* Improve sidebar text readability */
+.sidebar-drawer,
+.toc-drawer {
+    color: var(--ink-1);
+}
+
+/* Enhance sidebar link readability */
+.sidebar-tree a,
+.toc-tree a {
+    font-weight: 500;
+    padding: 6px 10px;
+    display: block;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+body[data-theme="light"] .sidebar-tree a,
+body[data-theme="light"] .toc-tree a {
+    color: #0d1829;
+}
+
+body[data-theme="dark"] .sidebar-tree a,
+body[data-theme="dark"] .toc-tree a {
+    color: #f5f8ff;
+}
+
+/* Better hover state */
+.sidebar-tree a:hover,
+.toc-tree a:hover {
+    background: rgba(255, 255, 255, 0.25) !important;
+}
+
+body[data-theme="dark"] .sidebar-tree a:hover,
+body[data-theme="dark"] .toc-tree a:hover {
+    background: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Active/current page styling */
+.sidebar-tree a.current,
+.toc-tree a.current {
+    background: rgba(var(--color-brand-primary), 0.15);
+    font-weight: 600;
+}
+
+a {
+    color: var(--link);
+    text-underline-offset: 3px;
+}
+
+a:hover {
+    filter: brightness(1.08) saturate(1.05);
+}
+
+/* Headings get a subtle shimmering underline on hover */
+article h1:hover,
+article h2:hover,
+article h3:hover,
+article h4:hover {
+    text-shadow: 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+/* ------------------------------
+     Code blocks & inline code
+     ------------------------------ */
+
+/* Inline :param role and code */
+.param-role,
+code.literal {
     font-family: var(--font-stack--monospace);
-    background-color: var(--color-background-secondary);
-    padding: 0.1em 0.3em;
-    border-radius: 3px;
-    font-size: 0.9em;
+    background-color: var(--glass-bg-soft);
+    padding: 0.15em 0.45em;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+}
+
+/* Code blocks */
+/* Remove default styling from wrappers */
+.highlight {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 1.5em 0;
+}
+
+/* Style the actual pre element with glass effect */
+div.highlight pre,
+pre.literal-block {
+    background: rgba(255, 255, 255, 0.45) !important;
+    -webkit-backdrop-filter: saturate(140%) blur(16px);
+    backdrop-filter: saturate(140%) blur(16px);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12), 
+                0 2px 6px rgba(16, 24, 40, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
+    border-radius: 12px !important;
+    padding: 20px 24px !important;
+    margin: 0 !important;
+    overflow-x: auto;
+    line-height: 1.6;
+}
+
+/* Dark mode code blocks */
+body[data-theme="dark"] div.highlight pre,
+body[data-theme="dark"] pre.literal-block {
+    background: rgba(17, 25, 40, 0.50) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 
+                0 2px 6px rgba(0, 0, 0, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Improve code text readability */
+div.highlight pre code,
+pre.literal-block code {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    font-size: 0.92em;
+    font-weight: 400;
+}
+
+/* ------------------------------
+   Admonitions & note boxes
+   ------------------------------ */
+.admonition {
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    box-shadow: var(--glass-shadow);
+    padding: 20px;
+}
+
+.admonition .admonition-title {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0));
+    border-bottom: 1px solid var(--glass-border);
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    padding: 12px 16px;
+    margin: -20px -20px 16px -20px;
+}
+
+/* ------------------------------
+   Buttons & toggles
+   ------------------------------ */
+.theme-toggle {
+    background: var(--glass-bg-soft);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    box-shadow: var(--glass-shadow);
+}
+
+.theme-toggle:hover {
+    transform: translateY(-1px);
+}
+
+/* Next/Prev page buttons as glass chips */
+.related-pages a {
+    background: var(--glass-bg-soft);
+    -webkit-backdrop-filter: saturate(160%) blur(18px);
+    backdrop-filter: saturate(160%) blur(18px);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+}
+
+.related-pages a:hover {
+    filter: brightness(1.05) saturate(1.05);
+}
+
+/* ------------------------------
+   Tables
+   ------------------------------ */
+/* All tables including docutils, autosummary, longtable */
+table.docutils,
+.table-wrapper table,
+table.longtable,
+table.autosummary {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.40) !important;
+    -webkit-backdrop-filter: saturate(140%) blur(16px);
+    backdrop-filter: saturate(140%) blur(16px);
+    border: 1px solid var(--glass-border) !important;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.10), 
+                0 2px 6px rgba(16, 24, 40, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4) !important;
+    border-radius: 12px !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    overflow: hidden;
+    margin: 1.5em 0;
+}
+
+/* Dark mode tables */
+body[data-theme="dark"] table.docutils,
+body[data-theme="dark"] .table-wrapper table,
+body[data-theme="dark"] table.longtable,
+body[data-theme="dark"] table.autosummary {
+    background: rgba(17, 25, 40, 0.45) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.30), 
+                0 2px 6px rgba(0, 0, 0, 0.20),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Table headers with gradient glass effect */
+table.docutils thead th,
+.table-wrapper table thead th,
+table.longtable thead th,
+table.autosummary thead th {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.08)) !important;
+    border-bottom: 2px solid var(--glass-border) !important;
+    border-right: 1px solid var(--glass-border) !important;
+    padding: 14px 18px !important;
+    font-weight: 600;
+    font-size: 0.92em;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--ink-1) !important;
+}
+
+body[data-theme="dark"] table.docutils thead th,
+body[data-theme="dark"] .table-wrapper table thead th,
+body[data-theme="dark"] table.longtable thead th,
+body[data-theme="dark"] table.autosummary thead th {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)) !important;
+}
+
+/* Remove border from last header cell */
+table.docutils thead th:last-child,
+.table-wrapper table thead th:last-child,
+table.longtable thead th:last-child,
+table.autosummary thead th:last-child {
+    border-right: none !important;
+}
+
+/* Table cells */
+table.docutils td,
+table.docutils th,
+.table-wrapper table td,
+.table-wrapper table th,
+table.longtable td,
+table.longtable th,
+table.autosummary td,
+table.autosummary th {
+    border-right: 1px solid var(--glass-border) !important;
+    border-bottom: 1px solid var(--glass-border) !important;
+    padding: 12px 18px !important;
+    line-height: 1.6;
+    vertical-align: top;
+}
+
+/* Remove border from last cell in row */
+table.docutils td:last-child,
+table.docutils th:last-child,
+.table-wrapper table td:last-child,
+.table-wrapper table th:last-child,
+table.longtable td:last-child,
+table.longtable th:last-child,
+table.autosummary td:last-child,
+table.autosummary th:last-child {
+    border-right: none !important;
+}
+
+/* Alternating row colors for readability */
+table.docutils tbody tr:nth-child(even),
+.table-wrapper table tbody tr:nth-child(even),
+table.longtable tbody tr:nth-child(even),
+table.autosummary tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+body[data-theme="dark"] table.docutils tbody tr:nth-child(even),
+body[data-theme="dark"] .table-wrapper table tbody tr:nth-child(even),
+body[data-theme="dark"] table.longtable tbody tr:nth-child(even),
+body[data-theme="dark"] table.autosummary tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* Row hover effect */
+table.docutils tbody tr:hover,
+.table-wrapper table tbody tr:hover,
+table.longtable tbody tr:hover,
+table.autosummary tbody tr:hover {
+    background: rgba(var(--color-brand-primary), 0.08);
+    transition: background 0.2s ease;
+}
+
+body[data-theme="dark"] table.docutils tbody tr:hover,
+body[data-theme="dark"] .table-wrapper table tbody tr:hover,
+body[data-theme="dark"] table.longtable tbody tr:hover,
+body[data-theme="dark"] table.autosummary tbody tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Style links in tables */
+table.docutils a,
+.table-wrapper table a,
+table.longtable a,
+table.autosummary a {
+    font-weight: 500;
+    text-decoration: none;
+}
+
+table.docutils a:hover,
+.table-wrapper table a:hover,
+table.longtable a:hover,
+table.autosummary a:hover {
+    text-decoration: underline;
+}
+
+/* Code in table cells */
+table.docutils code,
+.table-wrapper table code,
+table.longtable code,
+table.autosummary code {
+    background: rgba(0, 0, 0, 0.05) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px;
+    font-size: 0.88em;
+}
+
+body[data-theme="dark"] table.docutils code,
+body[data-theme="dark"] .table-wrapper table code,
+body[data-theme="dark"] table.longtable code,
+body[data-theme="dark"] table.autosummary code {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ------------------------------
+   Scrollbars (WebKit/Blink only)
+   ------------------------------ */
+*::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.18));
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+}
+
+body[data-theme="dark"] *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.10));
+}
+
+/* ------------------------------
+   Small polish
+   ------------------------------ */
+/* Ensure Furo's overlays remain clickable over blurred surfaces */
+.overlay {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Slight lift on hover for interactive list items */
+.sidebar-tree a,
+.toc-tree a,
+.reference.internal {
+    transition: transform 160ms ease, filter 160ms ease;
+}
+
+.sidebar-tree a:hover,
+.toc-tree a:hover,
+.reference.internal:hover {
+    transform: translateY(-1px);
 }

@@ -141,7 +141,7 @@ class SelectOptionsPaginator[PageT](BaseClassPaginator[PageT]):
     - :class:`list` or :class:`tuple` of the above
     - :class:`PaginatorOption` (a subclass of :class:`discord.SelectOption` with a ``content`` kwarg that can be any of the above)
 
-    Other parameters are the same as :class:`discord.ext.paginators.base_paginator.BaseClassPaginator`. Except ``per_page`` which is always ``1`` and cannot be changed.
+    Other parameters are the same as :class:`BaseClassPaginator`. Except ``per_page`` which is always ``1`` and cannot be changed.
 
     Parameters
     ----------

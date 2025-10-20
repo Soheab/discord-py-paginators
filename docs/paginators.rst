@@ -1,21 +1,20 @@
+.. currentmodule:: discord.ext.paginators
+
 Paginators
 ===========
 See here the various paginators available in this package.
 
+    
 Buttons
 ~~~~~~~~
-.. autoclass:: discord.ext.paginators.button_paginator.ButtonPaginator
-    :show-inheritance:
-
-.. autoclass:: discord.ext.paginators.button_paginator.PaginatorButton
-    :show-inheritance:
+.. autoclass:: ButtonPaginator
 
 Selects
-~~~~~~~~
-.. autoclass:: discord.ext.paginators.select_paginator.SelectOptionsPaginator
-    :members:
-    :show-inheritance:
+~~~~~~~
 
-.. autoclass:: discord.ext.paginators.select_paginator.PaginatorOption
-    :members:
-    :show-inheritance:
+.. autoclass:: SelectOptionPaginator
+
+Base
+~~~~
+
+.. autoclass:: BaseClassPaginator

@@ -14,6 +14,7 @@ Extension for discord.py that provides various paginators.
    paginators
    types
    base
+   enums
    whats_new
 
 Installation
