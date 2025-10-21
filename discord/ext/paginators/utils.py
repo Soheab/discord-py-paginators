@@ -59,7 +59,7 @@ async def _new_file(_file: discord.File | discord.Attachment, /) -> discord.File
 
 
 NON_CV2_ERROR = (
-    "Cannot mix non-v2 component {thing} ({item}) with components_v2 (or other v2 components). Use a {instead} instead."
+    "Cannot mix non-v2 component (or content) {thing} ({item}) with components_v2 (or other v2 components). Use a {instead} instead."
 )
 
 
@@ -77,7 +77,7 @@ def _ensure_only_v2_components(pages: Sequence[Any]) -> None:
     """Validate that pages only contain v2-compatible components."""
     for page in pages:
         if isinstance(page, discord.Embed):
-            msg = NON_CV2_ERROR.format(thing="Embed", item=page, instead="TextDisplay")
+            msg = NON_CV2_ERROR.format(thing="Embed", item=page, instead="Container")
             raise TypeError(msg)
         elif isinstance(page, (discord.ui.Button, discord.ui.Select)):
             msg = NON_CV2_ERROR.format(thing=page.__class__.__name__, item=page, instead="ActionRow")  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]

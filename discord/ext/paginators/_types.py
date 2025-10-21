@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
@@ -21,7 +20,6 @@ __all__ = (
     "BoundPage",
     "BoundV2Page",
     "BasePaginatorKwargs",
-    
 )
 
 
@@ -110,3 +108,6 @@ class BasePaginatorKwargs[PaginatorT: BaseClassPaginator[Any]](TypedDict, total=
 
     allowed_mentions: discord.AllowedMentions | bool | None
     view_cls: type[View[PaginatorT]] | None
+
+    title: str | discord.ui.TextDisplay[Any] | None
+    description: str | discord.ui.TextDisplay[Any] | None

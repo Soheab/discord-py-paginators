@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, NotRequired, Optional, TypedDict, overload
 
 import discord
@@ -394,60 +395,10 @@ class ButtonPaginator[PageT: (BoundPage, BoundV2Page)](
 
         self.__edit_button(key, options if not remove else None)
 
-    def _after_handling_pages(self) -> None:
+    async def handle_pages(self, pages: Sequence[PageT]) -> dict[str, Any]:
+        res = await super().handle_pages(pages)
         self.__add_buttons()
-        if isinstance(self.view, discord.ui.LayoutView):
-            return super()._after_handling_pages()
-
-        paginator_buttons: list[PaginatorButton] = []
-        row_widths: dict[int, int] = {}
-
-        for item in self.view.walk_children():
-            if isinstance(item, PaginatorButton):
-                paginator_buttons.append(item)
-            elif item._rendered_row is not None:
-                width = item.width
-                row_widths[item._rendered_row] = row_widths.get(item._rendered_row, 0) + width
-
-        if not paginator_buttons:
-            return super()._after_handling_pages()
-
-        paginator_buttons.sort(key=self.__buttons_sort_key)
-
-        total_width = sum(getattr(btn, "width", 1) for btn in paginator_buttons)
-        rows_needed = (len(paginator_buttons) + 4) // 5
-
-        start_row: int | None = None
-        for row in range(5 - rows_needed, -1, -1):
-            rows_to_check = range(row, min(row + rows_needed, 5))
-            if not all(row_widths.get(r, 0) < 5 for r in rows_to_check):
-                continue
-
-            available_space = sum(5 - row_widths.get(r, 0) for r in rows_to_check)
-            if available_space >= total_width:
-                start_row = row
-                break
-
-        if start_row is None:
-            raise ValueError("Not enough space in bottom rows to fit all paginator buttons together")
-
-        current_row = start_row
-        current_width = row_widths.get(current_row, 0)
-
-        for button in paginator_buttons:
-            button_width = button.width
-
-            if current_width + button_width > 5:
-                current_row += 1
-                if current_row >= 5:
-                    raise ValueError("Cannot fit all paginator buttons in available bottom rows")
-                current_width = row_widths.get(current_row, 0)
-
-            button._rendered_row = current_row
-            current_width += button_width
-            row_widths[current_row] = current_width
-
-        super()._after_handling_pages()
+        return res
 
     def _clear_all_view_items(self) -> None:
         if self._container:

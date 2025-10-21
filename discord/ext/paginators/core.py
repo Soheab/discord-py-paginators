@@ -158,6 +158,7 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
         A title to display on every page.
 
         This is always on the top of the page.
+        If the current page has an embed, the title will be set as the embed's title instead.
         :class:`str` will be converted to :class:`discord.ui.TextDisplay` when using v2 components.
 
         Defaults to ``None``.
@@ -167,6 +168,7 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
         A description to display on every page.
 
         This is always below the title.
+        If the current page has an embed, the description will be set as the embed's description instead.
         :class:`str` will be converted to :class:`discord.ui.TextDisplay` when using v2 components.
 
         Defaults to ``None``.
@@ -216,12 +218,13 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
             self.__components_v2 = _utils._has_v2_components(pages)
 
         print("cv2?", self.__components_v2)
-        self.__view: View[Self] = self.__init_view(view_cls=view_cls, timeout=timeout)
 
         self._per_page: int = per_page
         self._pages: Sequence[PageT] = []
         self.pages = pages or []
         self._current_page_index: int = 0
+
+        self.__view: View[Self] = self.__init_view(view_cls=view_cls, timeout=timeout)
 
         self.author_id: int | None = author_id
         self._check: PaginatorCheck[Self] | None = check
@@ -253,9 +256,6 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
 
         self.__owner_ids: set[int] | None = None
         self.__uses_commands_bot: bool | None = None
-
-        self._reset_base_kwargs()
-        self._get_base_kwargs = lambda: self.__base_kwargs
 
     @property
     def view(self) -> View[Self]:
@@ -293,7 +293,7 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
 
     @pages.setter
     def pages(self, value: Sequence[PageT]) -> None:
-        if isinstance(value, str):
+        if isinstance(value, str):  # "str" is a sequence/iterable, so we defend against it
             raise TypeError("pages must be a sequence of pages, not str.")
 
         if self.per_page > len(value):
@@ -347,7 +347,9 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
 
         if not issubclass(view_cls, expected_cls):
             subclasses = view_cls.__bases__
-            print("subclasses:", subclasses, expected_cls, issubclass(view_cls, expected_cls))
+            # all classes subclass object, so we remove it for clarity,
+            # otherwise it shows <class>, <class>, ..., object which is redundant and maybe confusing
+            # for the average user.
             if object in subclasses:
                 subclasses = [subcls for subcls in subclasses if subcls is not object]
 
@@ -382,21 +384,6 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
 
     def _clear_all_view_items(self) -> None:
         self.view.clear_items()
-
-    def _reset_base_kwargs(self) -> None:
-        if self.__components_v2:
-            self.__base_kwargs: BaseKwargs = {}
-        else:
-            self.__base_kwargs: BaseKwargs = {
-                "content": None,
-                "embeds": [],
-            }
-
-        self.__base_kwargs["view"] = self.view
-        if self.allowed_mentions is not None:
-            self.__base_kwargs["allowed_mentions"] = self.allowed_mentions
-
-        self._clear_all_view_items()
 
     def _disable_all_children(self) -> None:
         for child in self.view.walk_children():
@@ -434,33 +421,11 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
         _log.debug("No checks to run, allowing interaction")
         return True
 
-    def _handle_page_string(self) -> None:
-        if not self.add_page_string or self.__components_v2:
-            return
-
-        embeds = self.__base_kwargs.get("embeds", [])
-        content = self.__base_kwargs.get("content")
-        if embeds:
-            for embed in embeds:
-                to_set = self.page_string
-                if footer_text := embed.footer.text:
-                    if "|" in footer_text:
-                        footer_text = footer_text.split("|")[0].strip()
-                        to_set = f"{footer_text} | {self.page_string}"
-
-                embed.set_footer(text=to_set)
-        elif content:
-            self.__base_kwargs["content"] = f"{content}\n{self.page_string}"
-        else:
-            self.__base_kwargs["content"] = self.page_string
-
     def _add_item[Item: discord.ui.Item[Any]](self, item: Item) -> Item:
         self.view.add_item(item)
         return item
 
     def stop(self) -> None:
-        """Stops the view and resets the base kwargs."""
-        self._reset_base_kwargs()
         self.message = None
 
     async def on_timeout(self) -> None:
@@ -527,7 +492,6 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
                 await self.message.edit(view=self.view)
 
         self.stop()
-        self._reset_base_kwargs()
 
     def format_page(self, page: Sequence[PageT]) -> Sequence[PageT]:
         """Sequence[PageT]: An optional coroutine that can be overridden to format the pages before they are processed and sent."""
@@ -580,118 +544,173 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
         """
         pass
 
-    def _after_handling_pages(self) -> None:
-        if not (self.title or self.description):
+    def _handle_page_string(self, kwargs: dict[str, Any], items: list[discord.ui.Item[Any]]) -> None:
+        if not self.add_page_string:
             return
 
-        if self.__components_v2:
-            if self.title:
-                self._add_item(discord.ui.TextDisplay[Any](self.title))
-            if self.description:
-                self._add_item(discord.ui.TextDisplay[Any](self.description))
+        if not self.__components_v2:
+            embeds = kwargs.get("embeds", [])
+            content = kwargs.get("content")
+            if embeds:
+                embed = embeds[-1]
+                to_set = self.page_string
+                if footer_text := embed.footer.text:
+                    if "|" in footer_text:
+                        footer_text = footer_text.split("|")[0].strip()
+                        to_set = f"{footer_text} | {self.page_string}"
+
+                    embed.set_footer(text=to_set)
+            elif content:
+                kwargs["content"] = f"{content}\n{self.page_string}"
+            else:
+                kwargs["content"] = self.page_string
         else:
-            if self.title or self.description:
-                if self.__base_kwargs.get("content"):
-                    orginal_content = self.__base_kwargs["content"]  # pyright: ignore[reportTypedDictNotRequiredAccess]
-                    if self.title:
-                        orginal_content = f"**{self.title}**\n{orginal_content}"
-                    if self.description:
-                        orginal_content = f"{self.description}\n{orginal_content}"
-
-                    self.__base_kwargs["content"] = orginal_content
-                elif self.__base_kwargs.get("embeds"):
-                    embed = self.__base_kwargs["embeds"][0]  # pyright: ignore[reportTypedDictNotRequiredAccess]
-                    if self.title:
-                        embed.title = self.title
-                    if self.description:
-                        embed.description = self.description
-
-                else:
-                    embed = discord.Embed()
-                    if self.title:
-                        embed.title = self.title
-                    if self.description:
-                        embed.description = self.description
-
-                    self.__base_kwargs.setdefault("embeds", []).append(embed)
+            items.append(discord.ui.TextDisplay[Any](self.page_string))
 
     async def _handle_single_page(
         self, page: PageT, /, kwargs: dict[str, Any], items: list[discord.ui.Item[Any]]
     ) -> tuple[dict[str, Any], list[discord.ui.Item[Any]]]:
-        _kwargs: dict[str, Any] = {}
-        _items: list[discord.ui.Item[Any]] = items.copy()
-
         if isinstance(page, (int, str, discord.ui.TextDisplay)):
             if isinstance(page, discord.ui.TextDisplay):
                 items.append(page)
             elif self.__components_v2:
                 items.append(discord.ui.TextDisplay[Any](str(page)))
             else:
-                content = _kwargs.get("content")
-                _kwargs["content"] = f"{content}\n{page}" if content else str(page)
+                content = kwargs.get("content")
+                kwargs["content"] = f"{content}\n{page}" if content else str(page)
         elif isinstance(page, discord.Embed):
-            _kwargs.setdefault("embeds", []).append(page)
+            kwargs.setdefault("embeds", []).append(page)
         elif isinstance(page, discord.File | discord.Attachment):
             _file = await _utils._new_file(page)
-            _kwargs.setdefault("files", []).append(_file)
+            kwargs.setdefault("files", []).append(_file)
         elif isinstance(page, discord.ui.Item):
-            _items.append(page)
+            items.append(page)
         elif isinstance(page, dict):
-            _kwargs.update(page)
+            kwargs.update(page)
         else:
             for _page in page:
-                _kwargs, _items = await self._handle_single_page(_page, kwargs=_kwargs, items=_items)  # pyright: ignore[reportArgumentType]
+                if not _is_page(_page):
+                    raise TypeError(f"Invalid page type: {type(_page).__name__!r} in sequence.")
 
-        return _kwargs, _items
+                kwargs, items = await self._handle_single_page(_page, kwargs=kwargs, items=items)
+
+        return kwargs, items
 
     async def handle_pages(self, pages: Sequence[PageT]) -> dict[str, Any]:
-        _kwargs: dict[str, Any] = {}
+        """Recursively handles the pages and returns the kwargs to send/edit the message with.
+
+        What this does is:
+
+        - Clears all view items.
+        - Calls :meth:`.format_page` to format the pages.
+        - Iterates through all pages and handles them according to their type.
+        - Adds the title and description if set.
+        - Adds the page string if set.
+        - Adds all items to the view.
+
+        Parameters
+        ----------
+        pages: Sequence[PageT]
+            The pages to handle.
+
+        Returns
+        -------
+        dict[str, Any]
+            The kwargs to send/edit the message with.
+        """
+        self._clear_all_view_items()
+        kwargs: dict[str, Any] = {}
         items: list[discord.ui.Item[Any]] = []
 
         formatted_pages = await discord.utils.maybe_coroutine(self.format_page, pages)
 
+        print(f"handle_pages called with pages: {pages}")
+        print("formatted pages:", formatted_pages)
+
         for page in formatted_pages:
-            _page_kwargs, items = await self._handle_single_page(page, kwargs=_kwargs, items=items)
-            _kwargs |= _page_kwargs
+            kwargs, items = await self._handle_single_page(page, kwargs=kwargs, items=items)
             items.extend(items)
+
+        print("after handling pages, items:", items)
+        if any([self.title, self.description]):
+            if self.__components_v2:
+                if self.title:
+                    items.insert(0, discord.ui.TextDisplay[Any](self.title) if isinstance(self.title, str) else self.title)
+                if self.description:
+                    items.insert(
+                        1,
+                        discord.ui.TextDisplay[Any](self.description)
+                        if isinstance(self.description, str)
+                        else self.description,
+                    )
+            else:
+                embeds = kwargs.get("embeds", [])
+                content = kwargs.get("content")
+                if embeds:
+                    embed = embeds[-1]
+                    if self.title:
+                        embed.title = self.title
+                    if self.description:
+                        embed.description = self.description
+                elif content:
+                    prefix = ""
+                    if self.title:
+                        prefix += self.title
+                    if self.description:
+                        prefix += f"\n{self.description}"
+
+                    kwargs["content"] = f"{prefix}\n{content}"
+
+        self._handle_page_string(kwargs, items=items)
+
+        print("items to add:", items)
+        print("kwargs to send/edit with:", kwargs)
 
         if items:
             for item in items:
                 self._add_item(item)
 
-        return _kwargs
+        if self.allowed_mentions is not None:
+            kwargs["allowed_mentions"] = self.allowed_mentions
 
-    async def switch_page(self, interaction: discord.Interaction[Any] | None, page_number: int) -> None:
+        kwargs["view"] = self.view
+        return kwargs
+
+    async def switch_page(
+        self, interaction: discord.Interaction[Any] | None, page_number: int, set_index: bool = True
+    ) -> None:
         """Switches the page to the given page number.
+
+        This also calls :meth:`.on_page` after switching the page and if the page number changed and an interaction is given.
 
         Parameters
         ----------
         interaction: Optional[:class:`discord.Interaction`]
             The interaction to edit. If ``None``, ``.message`` is used.
         page_number: :class:`int`
-            The page number to switch to.
+            The page number to switch to. This is zero-indexed.
+        set_index: :class:`bool`
+            Whether to set the current page index to the given page number.
+
+            Setting to ``False`` is useful when you want to refresh the current page.
+            But in most cases, you should leave this as ``True`` to not cause any conflicts.
+
+            Defaults to ``True``.
         """
         previous_page_number: int = self.current_page_index
-        self.current_page_index = page_number
-        if previous_page_number == self.current_page_index:
+        if set_index:
+            self.current_page_index = page_number
+
+        page_changed = previous_page_number != self.current_page_index
+        if not page_changed and set_index:
             if interaction and not interaction.response.is_done():
                 await interaction.response.defer()
             return
 
         page_kwargs = await self.handle_pages(self.current_pages)
-        self._after_handling_pages()
-        # self._handle_page_string()
-
-        print(
-            "CHILDREN",
-            self.view.children,
-            list(self.view.walk_children()),
-            [i.id for i in list(self.view.walk_children())],
-            sep="\n",
-        )
         await self.edit(interaction, **page_kwargs)
 
-        if interaction:
+        if page_changed and interaction:
             await self.on_page(interaction, previous_page_number, self.current_page_index)
 
     async def edit(
@@ -780,10 +799,8 @@ class BaseClassPaginator[PageT: (BoundPage, BoundV2Page)]:
         if not isinstance(destination, (discord.abc.Messageable, discord.Interaction)):
             raise TypeError(f"destination must be Messageable or Interaction, not {destination.__class__.__name__!r}.")
 
-        page_kwargs: dict[str, Any] = await self.handle_pages(self.current_pages)  # pyright: ignore[reportAssignmentType]
-        self._after_handling_pages()
+        page_kwargs: dict[str, Any] = await self.handle_pages(self.current_pages) | send_kwargs
 
-        page_kwargs |= send_kwargs
         if isinstance(destination, discord.Interaction):
             if destination.response.is_done():
                 self.message = await destination.followup.send(**page_kwargs, wait=True)
